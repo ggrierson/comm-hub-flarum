@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  flarum:
+    image: mondedie/flarum:stable
+    container_name: flarum
+    depends_on:
+      - mariadb
+    volumes:
+      - flarum_assets:/flarum/app/assets
+      - flarum_extensions:/flarum/app/extensions
+      - flarum_storage:/flarum/storage
+    environment:
+      - DEBUG=false
+      - FORUM_URL=https://${DOMAIN}
+      - DB_HOST=mariadb
+      - DB_NAME=flarum
+      - DB_USER=flarum
+      - DB_PASS=${DB_PASSWORD}
+      - DB_PREF=flarum_
+      - DB_PORT=3306
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - SMTP_ENCRYPTION=tls
+      - SMTP_AUTH=true
+      - MAIL_FROM_ADDRESS=${MAIL_FROM}
+    ports:
+      - "8888:8888"
+
+  mariadb:
+    image: mariadb:10.6
+    container_name: flarum_db
+    restart: always
+    environment:
+      - MYSQL_ROOT_PASSWORD=${DB_PASSWORD}
+      - MYSQL_DATABASE=flarum
+      - MYSQL_USER=flarum
+      - MYSQL_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - mariadb_data:/var/lib/mysql
+
+  nginx:
+    image: nginx:stable-alpine
+    container_name: flarum_nginx
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - flarum_assets:/flarum/app/assets:ro
+      - flarum_extensions:/flarum/app/extensions:ro
+      - flarum_storage:/flarum/storage:ro
+      - ./certs:/etc/letsencrypt/live/${DOMAIN}:ro
+      - certbot_www:/var/www/certbot
+      - ./certs:/etc/letsencrypt
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - flarum
+
+  certbot:
+    image: certbot/certbot
+    container_name: certbot
+    volumes:
+      - certbot_www:/var/www/certbot
+      - ./certs:/etc/letsencrypt
+    entrypoint: >
+      sh -c "trap exit TERM; while :; do sleep 12h & wait $${!}; certbot renew --webroot -w /var/www/certbot --quiet --deploy-hook 'nginx -s reload'; done"
+
+volumes:
+  flarum_assets:
+  flarum_extensions:
+  flarum_storage:
+  mariadb_data:
+  certbot_www:
