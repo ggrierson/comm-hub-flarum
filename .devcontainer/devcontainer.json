@@ -1,0 +1,34 @@
+{
+  "name": "flarum-gcp-dev",
+  "image": "mcr.microsoft.com/devcontainers/base:debian",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/terraform:1": {}
+  },
+  "postCreateCommand": "sudo apt-get install -y apt-transport-https ca-certificates gnupg curl && \
+  echo \"deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main\" | \
+  sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list && \
+  curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | \
+  sudo gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg && \
+  sudo apt-get update && \
+  sudo apt-get install -y google-cloud-cli && \
+  terraform --version && gcloud version && docker --version",
+  "remoteEnv": {
+    "CLOUDSDK_CORE_PROJECT": "flarum-oss-forum"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "hashicorp.terraform",
+        "ms-azuretools.vscode-docker",
+        "googlecloudtools.cloudcode"
+      ]
+    }
+  },
+  "mounts": [
+    "source=${localEnv:HOME}/.config/gcloud,target=/home/vscode/.config/gcloud,type=bind,consistency=cached",
+    "source=${localEnv:HOME}/.docker,target=/home/vscode/.docker,type=bind,consistency=cached",
+    "source=${localEnv:HOME}/.gitconfig,target=/home/vscode/.gitconfig,type=bind,consistency=cached",
+    "source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached"
+  ]
+}

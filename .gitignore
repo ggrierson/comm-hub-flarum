@@ -1,0 +1,25 @@
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+terraform.tfvars
+crash.log
+*.backup
+
+# Docker
+certs/
+.env
+.env.*.local
+docker-compose.override.yml
+
+# Logs
+*.log
+
+# OS + Editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Custom scratch directory
+ignored/

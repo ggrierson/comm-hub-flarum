@@ -49,9 +49,8 @@ services:
       - flarum_assets:/flarum/app/assets:ro
       - flarum_extensions:/flarum/app/extensions:ro
       - flarum_storage:/flarum/storage:ro
-      - ./certs:/etc/letsencrypt/live/${DOMAIN}:ro
       - certbot_www:/var/www/certbot
-      - ./certs:/etc/letsencrypt
+      - ./certs:/etc/letsencrypt/live/${DOMAIN}:ro
     ports:
       - "80:80"
       - "443:443"
