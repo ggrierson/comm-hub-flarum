@@ -87,6 +87,9 @@ SMTP_PASS=$(retry gcloud secrets versions access latest --secret=smtp-pass --pro
 SMTP_MAIL_FROM=$(retry gcloud secrets versions access latest --secret=smtp-mail-from --project=$PROJECT_ID)
 echo "secrets retrieved: GITHUB_TOKEN, CERTBOT_EMAIL, FLARUM_DB_PASSWORD, SMTP_USER, SMTP_PASS, SMTP_MAIL_FROM"
 
+# Set consts
+REPO_DIR="/opt/flarum"
+
 # Ensure Git picks up .netrc and does not prompt
 export HOME=/root
 export GIT_TERMINAL_PROMPT=0
@@ -99,11 +102,14 @@ password $GITHUB_TOKEN
 EOF
 chmod 600 /root/.netrc
 
+# Create and enter repo directory
+mkdir -p "$REPO_DIR"
+cd "$REPO_DIR"
+
 echo "cloning deployment repository if necessary"
-if [ ! -d "flarum" ]; then
-  retry git clone https://github.com/ggrierson/comm-hub-flarum.git flarum
+if [ ! -d ".git" ]; then
+  retry git clone https://github.com/ggrierson/comm-hub-flarum.git .
 fi
-cd flarum
 echo "repository clone/setup complete"
 
 # Cleanup credentials
