@@ -36,6 +36,17 @@ wait_for_service() {
   done
 }
 
+# Wait for systemd to be ready
+for i in {1..60}; do
+  STATUS=$(systemctl is-system-running || echo "starting")
+  echo "↪ Status: $STATUS"
+  if [[ "$STATUS" == "running" || "$STATUS" == "degraded" ]]; then
+    echo "✔ System is ready (status: $STATUS)"
+    break
+  fi
+  sleep 2
+done
+
 echo "Performing initial apt update"
 wait_for_apt
 retry apt-get update
@@ -77,9 +88,10 @@ SMTP_MAIL_FROM=$(retry gcloud secrets versions access latest --secret=smtp-mail-
 echo "secrets retrieved: GITHUB_TOKEN, CERTBOT_EMAIL, FLARUM_DB_PASSWORD, SMTP_USER, SMTP_PASS, SMTP_MAIL_FROM"
 
 echo "cloning deployment repository if necessary"
-if [ ! -d ".git" ]; then
-  retry git clone https://"$GITHUB_TOKEN"@github.com/ggrierson/comm-hub-flarum.git .
+if [ ! -d "flarum" ]; then
+  retry git clone https://"$GITHUB_TOKEN"@github.com/ggrierson/comm-hub-flarum.git flarum
 fi
+cd flarum
 echo "repository clone/setup complete"
 
 echo "Templating environment"
