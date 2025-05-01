@@ -124,8 +124,9 @@ retry sed -i "s|{{SMTP_PASS}}|$SMTP_PASS|g" .env
 retry sed -i "s|{{SMTP_MAIL_FROM}}|$SMTP_MAIL_FROM|g" .env
 echo "environment file templated"
 
+echo "🧭 PWD before docker-compose: $(pwd)"
 echo "running docker-compose pull"
-# Launch Flarum stack
+ls -l nginx.conf certs# Launch Flarum stack
 retry docker-compose pull
 retry docker-compose up -d
 echo "docker-compose up complete"
