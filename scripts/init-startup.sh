@@ -30,7 +30,7 @@ echo "fstab entry ensured for $DISK_DEVICE"
 echo "Creating postboot bootstrap script"
 
 # Bootstrap to fetch and run postboot.sh
-cat << 'EOF' > "$MOUNT_POINT/bootstrap.sh"
+cat << 'EOF' > "/opt/flarum-data/bootstrap.sh"
 #!/bin/bash
 set -euo pipefail
 
@@ -50,11 +50,11 @@ fi
 # fetch and execute postboot
 $FETCH -H "Metadata-Flavor: Google" \
   http://metadata.google.internal/computeMetadata/v1/instance/attributes/postboot-script \
-  > "$MOUNT_POINT/postboot.sh"
-chmod +x "$MOUNT_POINT/postboot.sh"
-bash "$MOUNT_POINT/postboot.sh"
-touch "$MOUNT_POINT/.postboot-done"
+  > "/opt/flarum-data/postboot.sh"
+chmod +x "/opt/flarum-data/postboot.sh"
+bash "/opt/flarum-data/postboot.sh"
+touch "/opt/flarum-data/.postboot-done"
 EOF
 
-bash "$MOUNT_POINT/bootstrap.sh"
-echo "postboot bootstrap complete"
+bash "/opt/flarum-data/bootstrap.sh"
+echo "=== init-startup.sh: postboot bootstrap complete at $(date -Is) ===""
