@@ -94,8 +94,8 @@ export GIT_TERMINAL_PROMPT=0
 # Configure .netrc for Git authentication without exposing the token
 cat > /root/.netrc <<EOF
 machine github.com
-login $GITHUB_TOKEN
-password x-oauth-basic
+login ggrierson
+password $GITHUB_TOKEN
 EOF
 chmod 600 /root/.netrc
 

@@ -100,10 +100,6 @@ resource "google_compute_disk" "flarum-data-disk" {
   type  = "pd-standard"
   zone  = var.zone
   size  = var.data_disk_size
-
-  lifecycle {
-    prevent_destroy = true
-  }
 }
 
 resource "google_dns_record_set" "flarum_dns" {
@@ -139,4 +135,3 @@ variable "dns_project" {
   description = "The GCP project ID that owns the DNS zone"
   type        = string
 }
-
