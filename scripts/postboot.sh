@@ -101,19 +101,30 @@ login ggrierson
 password $GITHUB_TOKEN
 EOF
 chmod 600 /root/.netrc
+echo "🕵️‍♂️ .netrc contents:" 
+sed -e 's/^.*/&/g' /root/.netrc
 
 # Create and enter repo directory
 mkdir -p "$REPO_DIR"
 cd "$REPO_DIR"
+echo "🕵️‍♂️ Whoami: $(whoami), HOME: $HOME"
+
+echo "🕵️‍♂️ Testing git ls-remote…"
+GIT_TERMINAL_PROMPT=0 retry git ls-remote https://github.com/ggrierson/comm-hub-flarum.git
 
 echo "cloning deployment repository if necessary"
 if [ ! -d ".git" ]; then
+  set -x
   retry git clone https://github.com/ggrierson/comm-hub-flarum.git .
+  set +x
 fi
 echo "repository clone/setup complete"
 
 # Cleanup credentials
 rm -f /root/.netrc
+
+echo "🕵️‍♂️ Contents of $(pwd):"
+ls -lA
 
 echo "Templating environment"
 cp .env.template .env
