@@ -81,10 +81,11 @@ GITHUB_TOKEN=$(retry gcloud secrets versions access latest --secret=github-token
 SUBDOMAIN="forum-hub.team-apps.net"
 CERTBOT_EMAIL=$(retry gcloud secrets versions access latest --secret=certbot-email --project=$PROJECT_ID)
 FLARUM_DB_PASSWORD=$(retry gcloud secrets versions access latest --secret=flarum-db-password --project=$PROJECT_ID)
+FLARUM_ADMIN_PASSWORD=$(retry gcloud secrets versions access latest --secret=flarum-admin-password --project=$PROJECT_ID)
 SMTP_USER=$(retry gcloud secrets versions access latest --secret=smtp-user --project=$PROJECT_ID)
 SMTP_PASS=$(retry gcloud secrets versions access latest --secret=smtp-pass --project=$PROJECT_ID)
 SMTP_MAIL_FROM=$(retry gcloud secrets versions access latest --secret=smtp-mail-from --project=$PROJECT_ID)
-echo "secrets retrieved: GITHUB_TOKEN, CERTBOT_EMAIL, FLARUM_DB_PASSWORD, SMTP_USER, SMTP_PASS, SMTP_MAIL_FROM"
+echo "secrets retrieved: GITHUB_TOKEN, CERTBOT_EMAIL, FLARUM_DB_PASSWORD, FLARUM_ADMIN_PASSWORD, SMTP_USER, SMTP_PASS, SMTP_MAIL_FROM"
 
 ## CLONE REPO --------------------------------
 # Configure .netrc for Git authentication
@@ -125,7 +126,10 @@ rm -f /root/.netrc
 # Template environment file
 echo "Templating environment"
 cp .env.template .env
+retry sed -i "s|{{FORUM_URL}}|$SUBDOMAIN|g" .env
 retry sed -i "s|{{DB_PASSWORD}}|$FLARUM_DB_PASSWORD|g" .env
+retry sed -i "s|{{ADMIN_PASSWORD}}|$FLARUM_ADMIN_PASSWORD|g" .env
+retry sed -i "s|{{ADMIN_EMAIL}}|$CERTBOT_EMAIL|g" .env
 retry sed -i "s|{{CERTBOT_EMAIL}}|$CERTBOT_EMAIL|g" .env
 retry sed -i "s|{{SMTP_USER}}|$SMTP_USER|g" .env
 retry sed -i "s|{{SMTP_PASS}}|$SMTP_PASS|g" .env

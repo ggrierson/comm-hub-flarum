@@ -11,21 +11,16 @@ services:
       - flarum_extensions:/flarum/app/extensions
       - flarum_storage:/flarum/storage
     environment:
+      - .env
       - DEBUG=false
-      - FORUM_URL=https://${DOMAIN}
+      - FORUM_ADMIN_USERNAME=admin
       - DB_HOST=mariadb
       - DB_NAME=flarum
       - DB_USER=flarum
-      - DB_PASS=${DB_PASSWORD}
       - DB_PREF=flarum_
       - DB_PORT=3306
-      - SMTP_HOST=${SMTP_HOST}
-      - SMTP_PORT=${SMTP_PORT}
-      - SMTP_USER=${SMTP_USER}
-      - SMTP_PASS=${SMTP_PASS}
       - SMTP_ENCRYPTION=tls
       - SMTP_AUTH=true
-      - MAIL_FROM_ADDRESS=${MAIL_FROM}
     ports:
       - "8888:8888"
 
@@ -34,10 +29,9 @@ services:
     container_name: flarum_db
     restart: always
     environment:
-      - MYSQL_ROOT_PASSWORD=${DB_PASSWORD}
+      - .env
       - MYSQL_DATABASE=flarum
       - MYSQL_USER=flarum
-      - MYSQL_PASSWORD=${DB_PASSWORD}
     volumes:
       - mariadb_data:/var/lib/mysql
 
@@ -45,12 +39,12 @@ services:
     image: nginx:stable-alpine
     container_name: flarum_nginx
     volumes:
-      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - flarum_assets:/flarum/app/assets:ro
       - flarum_extensions:/flarum/app/extensions:ro
       - flarum_storage:/flarum/storage:ro
-      - ./certs/letsencrypt:/etc/letsencrypt:ro
-      - ./certs/letsencrypt:/var/www/certbot:ro
+      - ./certs:/etc/letsencrypt:ro
+      - ./certs:/var/www/certbot:ro
     ports:
       - "80:80"
       - "443:443"
@@ -61,8 +55,8 @@ services:
     image: certbot/certbot
     container_name: certbot
     volumes:
-      - ./certs/letsencrypt:/etc/letsencrypt:rw
-      - ./certs/letsencrypt:/var/www/certbot:rw
+      - ./certs:/etc/letsencrypt:rw
+      - ./certs:/var/www/certbot:rw
     entrypoint: /bin/sh -c
     command: |
       trap exit TERM
