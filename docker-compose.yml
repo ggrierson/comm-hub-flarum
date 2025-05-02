@@ -3,7 +3,6 @@ version: '3.8'
 services:
   flarum:
     image: mondedie/flarum:stable
-    container_name: flarum
     depends_on:
       - mariadb
     volumes:
@@ -72,4 +71,3 @@ volumes:
   flarum_extensions:
   flarum_storage:
   mariadb_data:
-  
