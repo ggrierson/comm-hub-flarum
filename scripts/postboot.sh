@@ -88,7 +88,7 @@ echo "secrets retrieved: GITHUB_TOKEN, CERTBOT_EMAIL, FLARUM_DB_PASSWORD, SMTP_U
 # Configure .netrc for Git authentication
 export HOME=/root
 export GIT_TERMINAL_PROMPT=0
-cat << 'EOF' > /root/.netrc
+cat << EOF > /root/.netrc
 machine github.com
 login ggrierson
 password $GITHUB_TOKEN
