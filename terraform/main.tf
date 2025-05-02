@@ -8,6 +8,7 @@ provider "google" {
 
 module "ops_agent_policy" {
   source        = "github.com/terraform-google-modules/terraform-google-cloud-operations/modules/ops-agent-policy"
+  count         = var.enable_ops_agent ? 1 : 0
   project       = var.project_id
   zone          = var.zone
   assignment_id = "goog-ops-agent-v2-x86-template-1-4-0-${var.zone}"
@@ -134,4 +135,9 @@ variable "dns_zone_name" {
 variable "dns_project" {
   description = "The GCP project ID that owns the DNS zone"
   type        = string
+}
+
+variable "enable_ops_agent" {
+  type    = bool
+  default = false
 }
