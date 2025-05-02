@@ -157,21 +157,34 @@ retry docker-compose up -d
 echo "Docker Compose operations complete"
 
 ## NEW CERTIFICATES ----------------------------
-# Provision TLS certificate if needed
-echo "checking TLS certificate provisioning"
-if [ ! -f "./certs/live/$SUBDOMAIN/fullchain.pem" ]; then
-  echo "Provisioning Let's Encrypt certificate for $SUBDOMAIN..."
-  retry docker run --rm \
-    -v "$(pwd)/certs:/var/www/certbot" \
-    -v "$(pwd)/certs:/etc/letsencrypt" \
-    certbot/certbot certonly \
-      --webroot -w /var/www/certbot \
-      --email "$CERTBOT_EMAIL" \
-      -d "$SUBDOMAIN" \
-      --agree-tos --non-interactive
-fi
+# Wait until NGINX is serving the HTTP-01 challenge endpoint
+echo "Waiting for NGINX to serve HTTP challenge"
+for i in {1..30}; do
+  STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost/.well-known/acme-challenge/test-path || echo "")
+  if echo "$STATUS" | grep -qE '^[234]'; then
+    echo "🟢 NGINX is up and reachable"
+    break
+  fi
+  echo "⏳ Waiting for NGINX to start... ($i)"
+  sleep 2
+done
 
-# Reload NGINX to pick up real certificate
+# Remove the bootstrap self-signed certificates so Certbot will request a real one
+echo "🧹 Removing bootstrap certificates for $SUBDOMAIN"
+rm -rf "./certs/live/$SUBDOMAIN"
+
+# Request the Let’s Encrypt certificate
+echo "Requesting real certificate for $SUBDOMAIN"
+retry docker run --rm \
+  -v "$(pwd)/certs:/var/www/certbot" \
+  -v "$(pwd)/certs:/etc/letsencrypt" \
+  certbot/certbot certonly \
+    --webroot -w /var/www/certbot \
+    --email "$CERTBOT_EMAIL" \
+    -d "$SUBDOMAIN" \
+    --agree-tos --non-interactive
+
+echo "Reloading NGINX with real certificate"
 docker-compose restart nginx
 
 echo "postboot.sh: complete at $(date -Is)"
