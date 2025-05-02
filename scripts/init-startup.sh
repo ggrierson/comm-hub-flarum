@@ -52,6 +52,7 @@ else
   FETCH="curl -fsSL"
 fi
 
+BOOT_DIR="/opt/flarum"
 # fetch and execute postboot
 $FETCH -H "Metadata-Flavor: Google" \
   http://metadata.google.internal/computeMetadata/v1/instance/attributes/postboot-script \
