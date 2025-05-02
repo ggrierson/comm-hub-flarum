@@ -43,7 +43,7 @@ for i in {1..60}; do
     break
   fi
   echo "  still starting (${i}/60)…"
-  sleep 2
+  sleep 5
 done
 
 echo "Performing initial apt update"
