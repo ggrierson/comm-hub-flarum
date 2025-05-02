@@ -69,10 +69,8 @@ echo "checking Google Cloud SDK installation"
 if ! command -v gcloud &>/dev/null; then
   wait_for_apt
   retry apt-get install -y apt-transport-https ca-certificates gnupg curl
-  retry curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg \
-    | gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg
-  echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" \
-    | tee /etc/apt/sources.list.d/google-cloud-sdk.list
+  retry curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg
+  echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee /etc/apt/sources.list.d/google-cloud-sdk.list
   retry apt-get install -y google-cloud-cli
   echo "Google Cloud SDK installed"
 fi
@@ -87,45 +85,41 @@ SMTP_PASS=$(retry gcloud secrets versions access latest --secret=smtp-pass --pro
 SMTP_MAIL_FROM=$(retry gcloud secrets versions access latest --secret=smtp-mail-from --project=$PROJECT_ID)
 echo "secrets retrieved: GITHUB_TOKEN, CERTBOT_EMAIL, FLARUM_DB_PASSWORD, SMTP_USER, SMTP_PASS, SMTP_MAIL_FROM"
 
-# Set consts
-REPO_DIR="/opt/flarum"
-
-# Ensure Git picks up .netrc and does not prompt
+# Configure .netrc for Git authentication
 export HOME=/root
 export GIT_TERMINAL_PROMPT=0
-
-# Configure .netrc for Git authentication without exposing the token
-cat > /root/.netrc <<EOF
+cat << 'EOF' > /root/.netrc
 machine github.com
 login ggrierson
 password $GITHUB_TOKEN
 EOF
 chmod 600 /root/.netrc
-echo "🕵️‍♂️ .netrc contents:" 
-sed -e 's/^.*/&/g' /root/.netrc
 
-# Create and enter repo directory
-mkdir -p "$REPO_DIR"
-cd "$REPO_DIR"
+echo "🕵️‍♂️ .netrc contents:"
+sed -e 's/.*/&/' /root/.netrc
+
+# Define where the app code lives on the boot disk
+CODE_ROOT="/opt/flarum"
+APP_DIR="$CODE_ROOT/flarum"
+# Ensure code directory exists and switch into it
+mkdir -p "$APP_DIR"
+cd "$APP_DIR"
 echo "🕵️‍♂️ Whoami: $(whoami), HOME: $HOME"
-
 echo "🕵️‍♂️ Testing git ls-remote…"
 GIT_TERMINAL_PROMPT=0 retry git ls-remote https://github.com/ggrierson/comm-hub-flarum.git
-
-echo "cloning deployment repository if necessary"
-if [ ! -d ".git" ]; then
-  set -x
-  retry git clone https://github.com/ggrierson/comm-hub-flarum.git .
-  set +x
-fi
-echo "repository clone/setup complete"
-
-# Cleanup credentials
-rm -f /root/.netrc
-
 echo "🕵️‍♂️ Contents of $(pwd):"
 ls -lA
+echo "Changed directory to $APP_DIR"
 
+echo "cloning deployment repository if necessary"
+if [ ! -d "$APP_DIR/.git" ]; then
+  retry git clone https://github.com/ggrierson/comm-hub-flarum.git "$APP_DIR"
+fi
+cd "$APP_DIR"
+echo "repository clone/setup complete"
+rm -f /root/.netrc
+
+# Template environment file
 echo "Templating environment"
 cp .env.template .env
 retry sed -i "s|{{DB_PASSWORD}}|$FLARUM_DB_PASSWORD|g" .env
@@ -135,19 +129,21 @@ retry sed -i "s|{{SMTP_PASS}}|$SMTP_PASS|g" .env
 retry sed -i "s|{{SMTP_MAIL_FROM}}|$SMTP_MAIL_FROM|g" .env
 echo "environment file templated"
 
+# Run Docker Compose
 echo "🧭 PWD before docker-compose: $(pwd)"
-echo "running docker-compose pull"
+echo "Listing nginx.conf and certs:"
 ls -l nginx.conf certs
-echo "Launch Flarum stack"
+
+# Run Docker Compose operations
 retry docker-compose pull
 retry docker-compose up -d
-echo "docker-compose up complete"
 
+echo "Docker Compose operations complete""
+
+# Provision TLS certificate if needed
 echo "checking TLS certificate provisioning"
-# Initial TLS certificate provisioning (if not already present)
 if [ ! -f "./certs/live/$DOMAIN/fullchain.pem" ]; then
   echo "Provisioning Let's Encrypt certificate for $DOMAIN..."
-
   retry docker run --rm \
     -v flarum_certbot_www:/var/www/certbot \
     -v "$(pwd)/certs:/etc/letsencrypt" \
