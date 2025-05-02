@@ -64,3 +64,4 @@ EOF
 
 bash "$BOOT_DIR/bootstrap.sh"
 echo "=== init-startup.sh: postboot bootstrap complete at $(date -Is) ==="
+exit 0

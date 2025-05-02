@@ -78,6 +78,7 @@ fi
 echo "Retrieving secrets"
 PROJECT_ID="flarum-oss-forum"
 GITHUB_TOKEN=$(retry gcloud secrets versions access latest --secret=github-token --project=$PROJECT_ID)
+SUBDOMAIN="forum-hub.team-apps.net"
 CERTBOT_EMAIL=$(retry gcloud secrets versions access latest --secret=certbot-email --project=$PROJECT_ID)
 FLARUM_DB_PASSWORD=$(retry gcloud secrets versions access latest --secret=flarum-db-password --project=$PROJECT_ID)
 SMTP_USER=$(retry gcloud secrets versions access latest --secret=smtp-user --project=$PROJECT_ID)
@@ -85,6 +86,7 @@ SMTP_PASS=$(retry gcloud secrets versions access latest --secret=smtp-pass --pro
 SMTP_MAIL_FROM=$(retry gcloud secrets versions access latest --secret=smtp-mail-from --project=$PROJECT_ID)
 echo "secrets retrieved: GITHUB_TOKEN, CERTBOT_EMAIL, FLARUM_DB_PASSWORD, SMTP_USER, SMTP_PASS, SMTP_MAIL_FROM"
 
+## CLONE REPO --------------------------------
 # Configure .netrc for Git authentication
 export HOME=/root
 export GIT_TERMINAL_PROMPT=0
@@ -99,26 +101,27 @@ echo "🕵️‍♂️ .netrc contents:"
 sed -e 's/.*/&/' /root/.netrc
 
 # Define where the app code lives on the boot disk
-CODE_ROOT="/opt/flarum"
-APP_DIR="$CODE_ROOT/flarum"
+REPO_DIR="/opt/flarum"
+# APP_DIR="/$REPO_DIR/flarum"
 # Ensure code directory exists and switch into it
-mkdir -p "$APP_DIR"
-cd "$APP_DIR"
+mkdir -p "$REPO_DIR"
+cd "$REPO_DIR"
+
+echo "Changed directory to $REPO_DIR"
 echo "🕵️‍♂️ Whoami: $(whoami), HOME: $HOME"
 echo "🕵️‍♂️ Testing git ls-remote…"
 GIT_TERMINAL_PROMPT=0 retry git ls-remote https://github.com/ggrierson/comm-hub-flarum.git
 echo "🕵️‍♂️ Contents of $(pwd):"
 ls -lA
-echo "Changed directory to $APP_DIR"
 
 echo "cloning deployment repository if necessary"
-if [ ! -d "$APP_DIR/.git" ]; then
-  retry git clone https://github.com/ggrierson/comm-hub-flarum.git "$APP_DIR"
+if [ ! -d "$REPO_DIR/.git" ]; then
+  retry git clone https://github.com/ggrierson/comm-hub-flarum.git "$REPO_DIR"
 fi
-cd "$APP_DIR"
 echo "repository clone/setup complete"
 rm -f /root/.netrc
 
+## CREATE ENV --------------------------------
 # Template environment file
 echo "Templating environment"
 cp .env.template .env
@@ -129,29 +132,45 @@ retry sed -i "s|{{SMTP_PASS}}|$SMTP_PASS|g" .env
 retry sed -i "s|{{SMTP_MAIL_FROM}}|$SMTP_MAIL_FROM|g" .env
 echo "environment file templated"
 
+## CERTIFICATES --------------------------------
+# Generate a temporary self-signed cert so Nginx can start
+mkdir -p ./certs/live/$SUBDOMAIN
+openssl req -x509 -nodes -days 2 -newkey rsa:2048 \
+  -keyout ./certs/live/$SUBDOMAIN/privkey.pem \
+  -out ./certs/live/$SUBDOMAIN/fullchain.pem \
+  -subj "/CN=${SUBDOMAIN}"
+
+## DOCKER --------------------------------
 # Run Docker Compose
 echo "🧭 PWD before docker-compose: $(pwd)"
-echo "Listing nginx.conf and certs:"
-ls -l nginx.conf certs
+# echo "Listing nginx.conf and certs:"
+# ls -l nginx.conf certs
 
 # Run Docker Compose operations
 retry docker-compose pull
 retry docker-compose up -d
 
-echo "Docker Compose operations complete""
+echo "Docker Compose operations complete"
 
+## NEW CERTIFICATES ----------------------------
 # Provision TLS certificate if needed
 echo "checking TLS certificate provisioning"
-if [ ! -f "./certs/live/$DOMAIN/fullchain.pem" ]; then
-  echo "Provisioning Let's Encrypt certificate for $DOMAIN..."
+if [ ! -f "./certs/live/$SUBDOMAIN/fullchain.pem" ]; then
+  echo "Provisioning Let's Encrypt certificate for $SUBDOMAIN..."
   retry docker run --rm \
-    -v flarum_certbot_www:/var/www/certbot \
+    -v "$(pwd)/certs:/var/www/certbot" \
     -v "$(pwd)/certs:/etc/letsencrypt" \
     certbot/certbot certonly \
-    --webroot -w /var/www/certbot \
-    --email "$CERTBOT_EMAIL" \
-    -d "$DOMAIN" \
-    --agree-tos --non-interactive
+      --webroot -w /var/www/certbot \
+      --email "$CERTBOT_EMAIL" \
+      -d "$SUBDOMAIN" \
+      --agree-tos --non-interactive
 fi
 
+# Reload NGINX to pick up real certificate
+docker-compose restart nginx
+
 echo "postboot.sh: complete at $(date -Is)"
+
+# Delete this file after startup since it contains tokens in plain text
+rm -- "$0"
