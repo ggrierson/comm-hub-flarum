@@ -27,12 +27,12 @@ echo "Mounted disk at $MOUNT_POINT"
 grep -q "^$DISK_DEVICE $MOUNT_POINT" /etc/fstab || echo "$DISK_DEVICE $MOUNT_POINT $FS_TYPE discard,defaults,nofail 0 2" >> /etc/fstab
 echo "fstab entry ensured for $DISK_DEVICE"
 
-echo "Setting up code directory on VM boot disk"
-BOOT_DIR="/opt/flarum"
+echo "Setting up bootstrap directory on VM boot disk"
+BOOT_DIR="/opt/bootstrap"
 mkdir -p "$BOOT_DIR"
-echo "Ensured code directory: $BOOT_DIR"
+echo "Ensured bootstrap directory: $BOOT_DIR"
 
-echo "Creating postboot bootstrap script in $BOOT_DIR"
+echo "Creating bootstrap script."
 
 # Bootstrap to fetch and run postboot.sh
 cat << 'EOF' > "$BOOT_DIR/bootstrap.sh"
@@ -52,7 +52,7 @@ else
   FETCH="curl -fsSL"
 fi
 
-BOOT_DIR="/opt/flarum"
+BOOT_DIR="/opt/bootstrap"
 # fetch and execute postboot
 $FETCH -H "Metadata-Flavor: Google" \
   http://metadata.google.internal/computeMetadata/v1/instance/attributes/postboot-script \
