@@ -27,10 +27,15 @@ echo "Mounted disk at $MOUNT_POINT"
 grep -q "^$DISK_DEVICE $MOUNT_POINT" /etc/fstab || echo "$DISK_DEVICE $MOUNT_POINT $FS_TYPE discard,defaults,nofail 0 2" >> /etc/fstab
 echo "fstab entry ensured for $DISK_DEVICE"
 
-echo "Creating postboot bootstrap script"
+echo "Setting up code directory on VM boot disk"
+BOOT_DIR="/opt/flarum"
+mkdir -p "$BOOT_DIR"
+echo "Ensured code directory: $BOOT_DIR"
+
+echo "Creating postboot bootstrap script in $BOOT_DIR"
 
 # Bootstrap to fetch and run postboot.sh
-cat << 'EOF' > "/opt/flarum-data/bootstrap.sh"
+cat << 'EOF' > "$BOOT_DIR/bootstrap.sh"
 #!/bin/bash
 set -euo pipefail
 
@@ -50,11 +55,11 @@ fi
 # fetch and execute postboot
 $FETCH -H "Metadata-Flavor: Google" \
   http://metadata.google.internal/computeMetadata/v1/instance/attributes/postboot-script \
-  > "/opt/flarum-data/postboot.sh"
-chmod +x "/opt/flarum-data/postboot.sh"
-bash "/opt/flarum-data/postboot.sh"
-touch "/opt/flarum-data/.postboot-done"
+  > "$BOOT_DIR/postboot.sh"
+chmod +x "$BOOT_DIR/postboot.sh"
+bash "$BOOT_DIR/postboot.sh"
+touch "$BOOT_DIR/.postboot-done"
 EOF
 
-bash "/opt/flarum-data/bootstrap.sh"
-echo "=== init-startup.sh: postboot bootstrap complete at $(date -Is) ===""
+bash "$BOOT_DIR/bootstrap.sh"
+echo "=== init-startup.sh: postboot bootstrap complete at $(date -Is) ==="

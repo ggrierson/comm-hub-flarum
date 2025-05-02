@@ -137,7 +137,8 @@ echo "environment file templated"
 
 echo "🧭 PWD before docker-compose: $(pwd)"
 echo "running docker-compose pull"
-ls -l nginx.conf certs# Launch Flarum stack
+ls -l nginx.conf certs
+echo "Launch Flarum stack"
 retry docker-compose pull
 retry docker-compose up -d
 echo "docker-compose up complete"
