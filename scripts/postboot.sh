@@ -36,14 +36,13 @@ wait_for_service() {
   done
 }
 
-# Wait for systemd to be ready
+echo "⏳ Waiting for systemd to be ready…"
 for i in {1..60}; do
-  STATUS=$(systemctl is-system-running || echo "starting")
-  echo "↪ Status: $STATUS"
-  if [[ "$STATUS" == "running" || "$STATUS" == "degraded" ]]; then
-    echo "✔ System is ready (status: $STATUS)"
+  if systemctl is-system-running --quiet; then
+    echo "✔ Systemd is ready"
     break
   fi
+  echo "  still starting (${i}/60)…"
   sleep 2
 done
 
