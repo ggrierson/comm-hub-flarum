@@ -37,13 +37,13 @@ wait_for_service() {
 }
 
 echo "⏳ Waiting for systemd to be ready…"
-for i in {1..100}; do
+for i in {1..10}; do
   if systemctl is-system-running --quiet; then
     echo "✔ Systemd is ready"
     break
   fi
-  echo "  still starting (${i}/60)…"
-  sleep 5
+  echo "  still starting (${i}/10)…"
+  sleep 2
 done
 
 echo "Performing initial apt update"
