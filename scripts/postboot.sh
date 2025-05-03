@@ -143,8 +143,8 @@ openssl req -x509 -nodes -days 2 -newkey rsa:2048 \
   -out ./certs/live/$SUBDOMAIN/fullchain.pem \
   -subj "/CN=${SUBDOMAIN}"
 
-+echo "📝 Diagnostic: listing bootstrap certs directory on host:"
-+ls -l certs/live/"$SUBDOMAIN"
+echo "📝 Diagnostic: listing bootstrap certs directory on host:"
+ls -l certs/live/"$SUBDOMAIN"
 
 ## DOCKER --------------------------------
 # Run Docker Compose
