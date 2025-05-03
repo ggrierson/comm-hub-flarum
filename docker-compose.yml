@@ -56,14 +56,25 @@ services:
   certbot:
     image: certbot/certbot
     container_name: certbot
+    build:
+      context: .
+      dockerfile: docker-certbot.Dockerfile
     volumes:
       - ./certs:/etc/letsencrypt:rw
       - ./certs:/var/www/certbot:rw
-    entrypoint: /bin/sh -c
-    command: |
-      trap exit TERM
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /usr/bin/docker:/usr/bin/docker:ro
+    entrypoint:
+      - /bin/sh
+      - -xc
+      - |
+        echo "🛠 certbot container starting…"
+        trap 'exit' TERM
       while :; do
-        certbot renew --webroot --webroot-path=/var/www/certbot --deploy-hook 'docker exec flarum_nginx nginx -s reload'
+          echo "🛠 certbot renewal loop iteration"
+          certbot renew \
+            --webroot --webroot-path=/var/www/certbot \
+            --deploy-hook 'docker exec flarum_nginx nginx -s reload'
         sleep 12h & wait $${!}
       done
     depends_on:
