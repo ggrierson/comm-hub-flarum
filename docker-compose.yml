@@ -9,8 +9,9 @@ services:
       - flarum_assets:/flarum/app/assets
       - flarum_extensions:/flarum/app/extensions
       - flarum_storage:/flarum/storage
+    env_file:
+        - .env
     environment:
-      - .env
       - DEBUG=false
       - FORUM_ADMIN_USERNAME=admin
       - DB_HOST=mariadb
@@ -27,8 +28,9 @@ services:
     image: mariadb:10.6
     container_name: flarum_db
     restart: always
+    env_file:
+        - .env
     environment:
-      - .env
       - MYSQL_DATABASE=flarum
       - MYSQL_USER=flarum
     volumes:

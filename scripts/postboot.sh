@@ -143,6 +143,9 @@ openssl req -x509 -nodes -days 2 -newkey rsa:2048 \
   -out ./certs/live/$SUBDOMAIN/fullchain.pem \
   -subj "/CN=${SUBDOMAIN}"
 
++echo "📝 Diagnostic: listing bootstrap certs directory on host:"
++ls -l certs/live/"$SUBDOMAIN"
+
 ## DOCKER --------------------------------
 # Run Docker Compose
 echo "🧭 PWD before docker-compose: $(pwd)"
@@ -154,6 +157,13 @@ retry docker-compose pull
 retry docker-compose up -d
 
 echo "Docker Compose operations complete"
+
+echo "📝 Host certs dir:"
+ls -l certs/live/"$SUBDOMAIN" || echo "❌ host certs not found"
+
+echo "📝 Nginx sees certs:"
+docker exec flarum_nginx ls -l /etc/letsencrypt/live/"$SUBDOMAIN" \
+  || echo "❌ nginx container or path not found"
 
 ## NEW CERTIFICATES ----------------------------
 # Wait until NGINX is serving the HTTP-01 challenge endpoint
