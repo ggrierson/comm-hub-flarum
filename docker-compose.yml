@@ -13,7 +13,8 @@ services:
         - .env
     environment:
       - DEBUG=false
-      - FORUM_ADMIN_USERNAME=admin
+      - FLARUM_ADMIN_USERNAME=admin
+      - FLARUM_TITLE="Forum Hub"
       - DB_HOST=mariadb
       - DB_NAME=flarum
       - DB_USER=flarum
