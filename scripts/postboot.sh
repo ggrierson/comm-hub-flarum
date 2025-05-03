@@ -125,14 +125,14 @@ rm -f /root/.netrc
 # Template environment file
 echo "Templating environment"
 cp .env.template .env
-retry sed -i "s|{{FORUM_URL}}|$SUBDOMAIN|g" .env
-retry sed -i "s|{{DB_PASSWORD}}|$FLARUM_DB_PASSWORD|g" .env
-retry sed -i "s|{{ADMIN_PASSWORD}}|$FLARUM_ADMIN_PASSWORD|g" .env
-retry sed -i "s|{{ADMIN_EMAIL}}|$CERTBOT_EMAIL|g" .env
-retry sed -i "s|{{CERTBOT_EMAIL}}|$CERTBOT_EMAIL|g" .env
-retry sed -i "s|{{SMTP_USER}}|$SMTP_USER|g" .env
-retry sed -i "s|{{SMTP_PASS}}|$SMTP_PASS|g" .env
-retry sed -i "s|{{SMTP_MAIL_FROM}}|$SMTP_MAIL_FROM|g" .env
+retry sed -i "s|{{SUBDOMAIN}}|${SUBDOMAIN//&/\\&}|g" .env
+retry sed -i "s|{{DB_PASSWORD}}|${FLARUM_DB_PASSWORD//&/\\&}|g" .env
+retry sed -i "s|{{ADMIN_PASSWORD}}|${FLARUM_ADMIN_PASSWORD//&/\\&}|g" .env
+retry sed -i "s|{{ADMIN_EMAIL}}|${CERTBOT_EMAIL//&/\\&}|g" .env
+retry sed -i "s|{{CERTBOT_EMAIL}}|${CERTBOT_EMAIL//&/\\&}|g" .env
+retry sed -i "s|{{SMTP_USER}}|${SMTP_USER//&/\\&}|g" .env
+retry sed -i "s|{{SMTP_PASS}}|${SMTP_PASS//&/\\&}|g" .env
+retry sed -i "s|{{SMTP_MAIL_FROM}}|${SMTP_MAIL_FROM//&/\\&}|g" .env
 echo "environment file templated"
 
 ## CERTIFICATES --------------------------------
