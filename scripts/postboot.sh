@@ -37,7 +37,7 @@ wait_for_service() {
 }
 
 echo "⏳ Waiting for systemd to be ready…"
-for i in {1..60}; do
+for i in {1..100}; do
   if systemctl is-system-running --quiet; then
     echo "✔ Systemd is ready"
     break
