@@ -3,6 +3,7 @@ version: '3.8'
 services:
   flarum:
     image: mondedie/flarum:stable
+    container_name: flarum
     depends_on:
       - mariadb
     volumes:
@@ -71,13 +72,13 @@ services:
       - |
         echo "🛠 certbot container starting…"
         trap 'exit' TERM
-      while :; do
+        while :; do
           echo "🛠 certbot renewal loop iteration"
           certbot renew \
             --webroot --webroot-path=/var/www/certbot \
             --deploy-hook 'docker exec flarum_nginx nginx -s reload'
-        sleep 12h & wait $${!}
-      done
+          sleep 12h & wait $${!}
+        done
     depends_on:
       - nginx
 
