@@ -85,3 +85,7 @@ volumes:
   flarum_extensions:
   flarum_storage:
   mariadb_data:
+
+networks:
+  default:
+    driver: bridge
