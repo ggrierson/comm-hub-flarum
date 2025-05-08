@@ -167,17 +167,7 @@ ls -l $CERTS_DIR/live/"$SUBDOMAIN"
 # Ensure ACME challenge webroot is writable and exists
 echo "➤ Creating webroot for HTTP-01 challenge"
 mkdir -p "$CERTS_DIR/.well-known/acme-challenge"
-chmod 755 "$CERTS_DIR/.well-known/acme-challenge"
-
-# one-off endpoint check to see if nginx is serving the right directory for certbot
-echo "🧭 Testing Nginx challenge endpoint…"
-echo test > "$CERTS_DIR/.well-known/acme-challenge/healthcheck"
-if curl -sf http://localhost/.well-known/acme-challenge/healthcheck; then
-  echo "✅ Challenge endpoint OK"
-else
-  echo "❌ Challenge endpoint failed, check your mounts & nginx.conf"
-  exit 1
-fi
+chmod 755 "$CERTS_DIR/.well-known" "$CERTS_DIR/.well-known/acme-challenge"
 
 ## DOCKER --------------------------------
 # Run Docker Compose
@@ -197,6 +187,18 @@ ls -l $CERTS_DIR/live/"$SUBDOMAIN" || echo "❌ host certs not found"
 echo "📝 Nginx sees certs:"
 docker exec flarum_nginx ls -l /etc/letsencrypt/live/"$SUBDOMAIN" \
   || echo "❌ nginx container or path not found"
+
+
+
+# one-off endpoint check to see if nginx is serving the right directory for certbot
+echo "🧪 Verifying ACME webroot inside the running Nginx container…"
+docker exec flarum_nginx ls -l /var/www/certbot/.well-known/acme-challenge || \
+  echo "❌ webroot not visible in nginx!"
+
+echo "🧪 Curling the healthcheck…"
+echo test > /opt/flarum-data/certs/.well-known/acme-challenge/healthcheck
+curl -v http://localhost/.well-known/acme-challenge/healthcheck || \
+  echo "❌ Nginx still not serving the file!"
 
 ## NEW CERTIFICATES ----------------------------
 # Wait until NGINX is serving the HTTP-01 challenge endpoint
