@@ -200,6 +200,11 @@ done
 echo "🧹 Removing bootstrap certificates for $SUBDOMAIN"
 rm -rf "$CERTS_DIR/live/$SUBDOMAIN"
 
+# Ensure ACME challenge webroot is writable and exists
+echo "➤ Creating webroot for HTTP-01 challenge"
+mkdir -p "$CERTS_DIR/.well-known/acme-challenge"
+chmod 755 "$CERTS_DIR/.well-known/acme-challenge"
+
 # Request the Let’s Encrypt certificate
 echo "Requesting real certificate for $SUBDOMAIN"
 retry docker run --rm \
