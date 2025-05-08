@@ -86,7 +86,7 @@ volumes:
   # flarum_assets:
   # flarum_extensions:
   # flarum_storage:
-  mariadb_data:
+  # mariadb_data:
 
 networks:
   default:
