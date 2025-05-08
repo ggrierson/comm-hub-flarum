@@ -143,14 +143,16 @@ echo "environment file templated"
 
 ## CERTIFICATES --------------------------------
 # Generate a temporary self-signed cert so Nginx can start
-mkdir -p ./certs/live/$SUBDOMAIN
+CERTS_DIR="/opt/flarum-data/certs"
+mkdir -p "$CERTS_DIR/live/$SUBDOMAIN"
+chmod 700 "$CERTS_DIR"
 openssl req -x509 -nodes -days 2 -newkey rsa:2048 \
-  -keyout ./certs/live/$SUBDOMAIN/privkey.pem \
-  -out ./certs/live/$SUBDOMAIN/fullchain.pem \
+  -keyout $CERTS_DIR/live/$SUBDOMAIN/privkey.pem \
+  -out $CERTS_DIR/live/$SUBDOMAIN/fullchain.pem \
   -subj "/CN=${SUBDOMAIN}"
 
 echo "📝 Diagnostic: listing bootstrap certs directory on host:"
-ls -l certs/live/"$SUBDOMAIN"
+ls -l $CERTS_DIR/live/"$SUBDOMAIN"
 
 ## DOCKER --------------------------------
 # Run Docker Compose
@@ -165,7 +167,7 @@ retry docker-compose up -d
 echo "Docker Compose operations complete"
 
 echo "📝 Host certs dir:"
-ls -l certs/live/"$SUBDOMAIN" || echo "❌ host certs not found"
+ls -l $CERTS_DIR/live/"$SUBDOMAIN" || echo "❌ host certs not found"
 
 echo "📝 Nginx sees certs:"
 docker exec flarum_nginx ls -l /etc/letsencrypt/live/"$SUBDOMAIN" \
@@ -186,13 +188,13 @@ done
 
 # Remove the bootstrap self-signed certificates so Certbot will request a real one
 echo "🧹 Removing bootstrap certificates for $SUBDOMAIN"
-rm -rf "./certs/live/$SUBDOMAIN"
+rm -rf "$CERTS_DIR/live/$SUBDOMAIN"
 
 # Request the Let’s Encrypt certificate
 echo "Requesting real certificate for $SUBDOMAIN"
 retry docker run --rm \
-  -v "$(pwd)/certs:/var/www/certbot" \
-  -v "$(pwd)/certs:/etc/letsencrypt" \
+  -v "$CERTS_DIR":/var/www/certbot \
+  -v "$CERTS_DIR":/etc/letsencrypt \
   certbot/certbot certonly \
     --webroot -w /var/www/certbot \
     --email "$CERTBOT_EMAIL" \

@@ -7,9 +7,9 @@ services:
     depends_on:
       - mariadb
     volumes:
-      - flarum_assets:/flarum/app/public/assets:rw
-      - flarum_extensions:/flarum/app/extensions:rw
-      - flarum_storage:/flarum/app/storage:rw
+     - /opt/flarum-data/assets:/flarum/app/public/assets:rw
+     - /opt/flarum-data/extensions:/flarum/app/extensions:rw
+     - /opt/flarum-data/storage:/flarum/app/storage:rw
     env_file:
         - .env
     environment:
@@ -37,18 +37,18 @@ services:
       - MYSQL_DATABASE=flarum
       - MYSQL_USER=flarum
     volumes:
-      - mariadb_data:/var/lib/mysql
+      - /opt/flarum-data/mariadb:/var/lib/mysql:rw
 
   nginx:
     image: nginx:stable-alpine
     container_name: flarum_nginx
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - flarum_assets:/flarum/app/public/assets:ro
-      - flarum_extensions:/flarum/app/extensions:ro
-      - flarum_storage:/flarum/storage:ro
-      - ./certs:/etc/letsencrypt:ro
-      - ./certs:/var/www/certbot:ro
+      - /opt/flarum-data/assets:/flarum/app/public/assets:ro
+      - /opt/flarum-data/extensions:/flarum/app/extensions:ro
+      - /opt/flarum-data/storage:/flarum/app/storage:ro
+      - /opt/flarum-data/certs:/etc/letsencrypt:ro
+      - /opt/flarum-data/certs:/var/www/certbot:ro
     ports:
       - "80:80"
       - "443:443"
@@ -62,8 +62,8 @@ services:
       context: .
       dockerfile: docker-certbot.Dockerfile
     volumes:
-      - ./certs:/etc/letsencrypt:rw
-      - ./certs:/var/www/certbot:rw
+      - /opt/flarum-data/certs:/etc/letsencrypt:rw
+      - /opt/flarum-data/certs:/var/www/certbot:rw
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /usr/bin/docker:/usr/bin/docker:ro
     entrypoint:
@@ -83,9 +83,9 @@ services:
       - nginx
 
 volumes:
-  flarum_assets:
-  flarum_extensions:
-  flarum_storage:
+  # flarum_assets:
+  # flarum_extensions:
+  # flarum_storage:
   mariadb_data:
 
 networks:

@@ -33,6 +33,14 @@ echo "Mounted disk at $MOUNT_POINT"
 grep -q "^$DISK_DEVICE $MOUNT_POINT" /etc/fstab || echo "$DISK_DEVICE $MOUNT_POINT $FS_TYPE discard,defaults,nofail 0 2" >> /etc/fstab
 echo "fstab entry ensured for $DISK_DEVICE"
 
+# -------------------------------------------------------------------
+# Seed all of our persistent paths on the data disk (idempotent!)
+echo "Seeding persistent data dirs on $MOUNT_POINT"
+mkdir -p "$MOUNT_POINT"/{mariadb,assets,extensions,storage,certs}
+chmod 755    "$MOUNT_POINT"
+echo "  → created: $MOUNT_POINT/mariadb, assets, extensions, storage, certs"
+# -------------------------------------------------------------------
+
 echo "Setting up bootstrap directory on VM boot disk"
 BOOT_DIR="/opt/bootstrap"
 mkdir -p "$BOOT_DIR"
