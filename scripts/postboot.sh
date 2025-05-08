@@ -164,6 +164,21 @@ openssl req -x509 -nodes -days 2 -newkey rsa:2048 \
 echo "📝 Diagnostic: listing bootstrap certs directory on host:"
 ls -l $CERTS_DIR/live/"$SUBDOMAIN"
 
+# Ensure ACME challenge webroot is writable and exists
+echo "➤ Creating webroot for HTTP-01 challenge"
+mkdir -p "$CERTS_DIR/.well-known/acme-challenge"
+chmod 755 "$CERTS_DIR/.well-known/acme-challenge"
+
+# one-off endpoint check to see if nginx is serving the right directory for certbot
+echo "🧭 Testing Nginx challenge endpoint…"
+echo test > "$CERTS_DIR/.well-known/acme-challenge/healthcheck"
+if curl -sf http://localhost/.well-known/acme-challenge/healthcheck; then
+  echo "✅ Challenge endpoint OK"
+else
+  echo "❌ Challenge endpoint failed, check your mounts & nginx.conf"
+  exit 1
+fi
+
 ## DOCKER --------------------------------
 # Run Docker Compose
 echo "🧭 PWD before docker-compose: $(pwd)"
@@ -196,24 +211,9 @@ for i in {1..30}; do
   sleep 2
 done
 
-# one-off endpoint check to see if nginx is serving the right directory for certbot
-echo "🧭 Testing Nginx challenge endpoint…"
-echo test > "$CERTS_DIR/.well-known/acme-challenge/healthcheck"
-if curl -sf http://localhost/.well-known/acme-challenge/healthcheck; then
-  echo "✅ Challenge endpoint OK"
-else
-  echo "❌ Challenge endpoint failed, check your mounts & nginx.conf"
-  exit 1
-fi
-
 # Remove the bootstrap self-signed certificates so Certbot will request a real one
 echo "🧹 Removing bootstrap certificates for $SUBDOMAIN"
 rm -rf "$CERTS_DIR/live/$SUBDOMAIN"
-
-# Ensure ACME challenge webroot is writable and exists
-echo "➤ Creating webroot for HTTP-01 challenge"
-mkdir -p "$CERTS_DIR/.well-known/acme-challenge"
-chmod 755 "$CERTS_DIR/.well-known/acme-challenge"
 
 # Request the Let’s Encrypt certificate
 echo "Requesting real certificate for $SUBDOMAIN"
