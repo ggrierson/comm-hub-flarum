@@ -46,6 +46,9 @@ BOOT_DIR="/opt/bootstrap"
 mkdir -p "$BOOT_DIR"
 echo "Ensured bootstrap directory: $BOOT_DIR"
 
+# nuke any ancient scripts so we start from a blank slate
+rm -f "$BOOT_DIR/bootstrap.sh" "$BOOT_DIR/postboot.sh"
+
 echo "Creating bootstrap script."
 
 # Bootstrap to fetch and run postboot.sh

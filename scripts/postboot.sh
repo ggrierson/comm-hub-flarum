@@ -4,6 +4,16 @@ set -euo pipefail
 # DEBUG: turn on command-by-command tracing
 set -x
 
+# if we've already run once, bail out immediately
+MARKER=/opt/bootstrap/.postboot-done
+if [[ -f "$MARKER" ]]; then
+  echo "⏭ postboot.sh: already completed, skipping."
+  exit 0
+fi
+
+# ensure this script is deleted when it exits (even on error)
+trap 'rm -f "$0"' EXIT
+
 # Trap any error and print the failing line, command, and exit code
 trap 'rc=$?; echo "❌ ERROR in ${0##*/} at line ${LINENO}: \\"${BASH_COMMAND}\\" exited with $rc" >&2; exit $rc' ERR
 
@@ -205,6 +215,3 @@ echo "Reloading NGINX with real certificate"
 docker-compose restart nginx
 
 echo "postboot.sh: complete at $(date -Is)"
-
-# Delete this file after startup since it contains tokens in plain text
-rm -- "$0"
