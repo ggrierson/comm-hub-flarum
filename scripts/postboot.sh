@@ -1,7 +1,13 @@
 #!/bin/bash
 set -euo pipefail
 
-echo "=== postboot.sh: starting at $(date -Is) ==="
+# DEBUG: turn on command-by-command tracing
+set -x
+
+# Trap any error and print the failing line, command, and exit code
+trap 'rc=$?; echo "❌ ERROR in ${0##*/} at line ${LINENO}: \\"${BASH_COMMAND}\\" exited with $rc" >&2; exit $rc' ERR
+
+echo "=== ${0##*/}: starting at $(date -Is) ==="
 
 # Retry helper: retry a command up to 5 times with delay
 retry() {
