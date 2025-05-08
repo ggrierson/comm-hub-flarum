@@ -155,7 +155,7 @@ echo "environment file templated"
 # Generate a temporary self-signed cert so Nginx can start
 CERTS_DIR="/opt/flarum-data/certs"
 mkdir -p "$CERTS_DIR/live/$SUBDOMAIN"
-chmod 700 "$CERTS_DIR"
+chmod 755 "$CERTS_DIR"
 openssl req -x509 -nodes -days 2 -newkey rsa:2048 \
   -keyout $CERTS_DIR/live/$SUBDOMAIN/privkey.pem \
   -out $CERTS_DIR/live/$SUBDOMAIN/fullchain.pem \
