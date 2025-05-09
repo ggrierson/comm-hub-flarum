@@ -38,9 +38,11 @@ echo "fstab entry ensured for $DISK_DEVICE"
 echo "Seeding persistent data dirs on $MOUNT_POINT"
 mkdir -p "$MOUNT_POINT"/{mariadb,assets,extensions,storage,certs}
 chmod 755    "$MOUNT_POINT"
-chown -R 991:991 /opt/flarum-data/assets \
-                /opt/flarum-data/extensions \
-                /opt/flarum-data/storage
+chown -R 991:991 "$MOUNT_POINT/assets"
+chown -R 991:991 "$MOUNT_POINT/extensions"
+# chown -R 991:991 "$MOUNT_POINT/storage"
+# mkdir -p "$MOUNT_POINT/storage/cache" "$MOUNT_POINT/storage/logs"
+# chown -R 991:991 "$MOUNT_POINT/storage/cache" "$MOUNT_POINT/storage/logs"
 echo "  → created: $MOUNT_POINT/mariadb, assets, extensions, storage, certs"
 # -------------------------------------------------------------------
 

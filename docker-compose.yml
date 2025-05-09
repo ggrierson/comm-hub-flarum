@@ -9,7 +9,7 @@ services:
     volumes:
      - /opt/flarum-data/assets:/flarum/app/public/assets:rw
      - /opt/flarum-data/extensions:/flarum/app/extensions:rw
-     - /opt/flarum-data/storage:/flarum/app/storage:rw
+     - /opt/flarum-data/storage/logs:/flarum/app/storage/logs:rw
     env_file:
         - .env
     environment:
@@ -46,7 +46,7 @@ services:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - /opt/flarum-data/assets:/flarum/app/public/assets:ro
       - /opt/flarum-data/extensions:/flarum/app/extensions:ro
-      - /opt/flarum-data/storage:/flarum/app/storage:ro
+      # - /opt/flarum-data/storage:/flarum/app/storage:ro
       - /opt/flarum-data/certs:/etc/letsencrypt:ro
       - /opt/flarum-data/certs:/var/www/certbot:ro
     ports:
