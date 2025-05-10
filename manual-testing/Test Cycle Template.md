@@ -31,7 +31,7 @@ This test plan validates the following core tenets of your deployment:
 * [ ] Forum UI loads at `forum-hub.team-apps.net`
 * [ ] Admin login works
 * [ ] Reboot VM and validate forum state is retained (users/posts)
-* [ ] Confirm secrets are pulled again cleanly
+* [ ] Confirm secret-dependent env values are still valid (e.g., login works, SMTP config is correct)
 
 ---
 
