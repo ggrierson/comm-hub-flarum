@@ -194,6 +194,26 @@ echo "➤ Creating webroot for HTTP-01 challenge"
 mkdir -p "$CERTS_DIR/.well-known/acme-challenge"
 chmod 755 "$CERTS_DIR/.well-known" "$CERTS_DIR/.well-known/acme-challenge"
 
+# Wait until .flarum.env is fully written and contains the required value
+wait_for_env_var() {
+  local file="$1"
+  local var="$2"
+  local max_attempts=10
+  local attempt=1
+
+  until grep -q "^${var}=" "$file"; do
+    if (( attempt == max_attempts )); then
+      echo "❌ $var not found in $file after $attempt attempts" >&2
+      exit 1
+    fi
+    echo "⏳ Waiting for $var to appear in $file… ($attempt/$max_attempts)"
+    ((attempt++)) && sleep 1
+  done
+}
+wait_for_env_var .flarum.env "FLARUM_ADMIN_PASS"
+echo "📄 Final contents of .flarum.env:"
+cat .flarum.env
+
 ## DOCKER --------------------------------
 # Run Docker Compose
 echo "🧭 PWD before docker-compose: $(pwd)"
