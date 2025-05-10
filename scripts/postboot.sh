@@ -151,13 +151,29 @@ echo "Loaded postboot env: SUBDOMAIN=$SUBDOMAIN, STAGING=$LETSENCRYPT_ENV_STAGIN
 # Template environment file
 echo "Templating .flarum.env"
 cp .flarum.env.template .flarum.env
-retry sed -i "s|{{FORUM_SUBDOMAIN}}|${SUBDOMAIN//&/\\&}|g" .flarum.env
-retry sed -i "s|{{DB_PASSWORD}}|${FLARUM_DB_PASSWORD//&/\\&}|g" .flarum.env
-retry sed -i "s|{{ADMIN_PASSWORD}}|${FLARUM_ADMIN_PASSWORD//&/\\&}|g" .flarum.env
-retry sed -i "s|{{ADMIN_EMAIL}}|${SECRET_CERTBOT_EMAIL//&/\\&}|g" .flarum.env
-retry sed -i "s|{{SMTP_USER}}|${SMTP_USER//&/\\&}|g" .flarum.env
-retry sed -i "s|{{SMTP_PASS}}|${SMTP_PASS//&/\\&}|g" .flarum.env
-retry sed -i "s|{{SMTP_MAIL_FROM}}|${SMTP_MAIL_FROM//&/\\&}|g" .flarum.env
+
+#Helper function - escape &, /, \ in the value before sed
+escape_sed() {
+  echo "$1" | sed -e 's/[&/\]/\\&/g'
+}
+
+# Escape all values for sed safety
+SUB_ESCAPED=$(escape_sed "$SUBDOMAIN")
+DB_PASS_ESCAPED=$(escape_sed "$FLARUM_DB_PASSWORD")
+ADMIN_PASS_ESCAPED=$(escape_sed "$FLARUM_ADMIN_PASSWORD")
+ADMIN_EMAIL_ESCAPED=$(escape_sed "$SECRET_CERTBOT_EMAIL")
+SMTP_USER_ESCAPED=$(escape_sed "$SMTP_USER")
+SMTP_PASS_ESCAPED=$(escape_sed "$SMTP_PASS")
+SMTP_MAIL_FROM_ESCAPED=$(escape_sed "$SMTP_MAIL_FROM")
+
+# Substitute values into .flarum.env
+retry sed -i "s|{{FORUM_SUBDOMAIN}}|$SUB_ESCAPED|g" .flarum.env
+retry sed -i "s|{{DB_PASSWORD}}|$DB_PASS_ESCAPED|g" .flarum.env
+retry sed -i "s|{{ADMIN_PASSWORD}}|$ADMIN_PASS_ESCAPED|g" .flarum.env
+retry sed -i "s|{{ADMIN_EMAIL}}|$ADMIN_EMAIL_ESCAPED|g" .flarum.env
+retry sed -i "s|{{SMTP_USER}}|$SMTP_USER_ESCAPED|g" .flarum.env
+retry sed -i "s|{{SMTP_PASS}}|$SMTP_PASS_ESCAPED|g" .flarum.env
+retry sed -i "s|{{SMTP_MAIL_FROM}}|$SMTP_MAIL_FROM_ESCAPED|g" .flarum.env
 echo ".flarum.env file templated"
 
 ## CERTIFICATES --------------------------------
