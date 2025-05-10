@@ -140,6 +140,14 @@ echo "repository clone/setup complete"
 rm -f /root/.netrc
 
 ## CREATE ENV --------------------------------
+# --- POSTBOOT ENVIRONMENT SETUP ---
+echo "Templating .postboot.env"
+cp .postboot.env.template .postboot.env
+set -a
+source .postboot.env
+set +a
+echo "Loaded postboot env: SUBDOMAIN=$SUBDOMAIN, STAGING=$LETSENCRYPT_ENV_STAGING"
+
 # Template environment file
 echo "Templating .flarum.env"
 cp .flarum.env.template .flarum.env
@@ -151,15 +159,6 @@ retry sed -i "s|{{SMTP_USER}}|${SMTP_USER//&/\\&}|g" .flarum.env
 retry sed -i "s|{{SMTP_PASS}}|${SMTP_PASS//&/\\&}|g" .flarum.env
 retry sed -i "s|{{SMTP_MAIL_FROM}}|${SMTP_MAIL_FROM//&/\\&}|g" .flarum.env
 echo ".flarum.env file templated"
-
-# --- POSTBOOT ENVIRONMENT SETUP ---
-echo "Templating .postboot.env"
-cp .postboot.env.template .postboot.env
-set -a
-source .postboot.env
-set +a
-echo "Loaded postboot env: SUBDOMAIN=$SUBDOMAIN, STAGING=$LETSENCRYPT_ENV_STAGING"
-
 
 ## CERTIFICATES --------------------------------
 # Generate a temporary self-signed cert so Nginx can start
