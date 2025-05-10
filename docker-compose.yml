@@ -14,7 +14,6 @@ services:
         - .flarum.env
     environment:
       - FLARUM_ADMIN_USER=admin
-      - FLARUM_ADMIN_PASS="${FLARUM_ADMIN_PASS}"
       - FLARUM_TITLE="Forum Hub"
       - DB_HOST=mariadb
       - DB_NAME=flarum
