@@ -219,6 +219,15 @@ rm -rf "$CERTS_DIR/live/$SUBDOMAIN"
 
 # Request the Let’s Encrypt certificate
 echo "Requesting real certificate for $SUBDOMAIN"
+# Determine Let’s Encrypt server endpoint (staging/prod)
+if [[ "${LETSENCRYPT_ENV_STAGING,,}" == "true" ]]; then
+  ACME_SERVER="--server https://acme-staging-v02.api.letsencrypt.org/directory"
+  echo "🧪 Using Let’s Encrypt STAGING environment"
+else
+  ACME_SERVER=""
+  echo "✅ Using Let’s Encrypt PRODUCTION environment"
+fi
+
 retry docker run --rm \
   -v "$CERTS_DIR":/var/www/certbot \
   -v "$CERTS_DIR":/etc/letsencrypt \
@@ -226,7 +235,8 @@ retry docker run --rm \
     --webroot -w /var/www/certbot \
     --email "$CERTBOT_EMAIL" \
     -d "$SUBDOMAIN" \
-    --agree-tos --non-interactive
+    --agree-tos --non-interactive \
+    $ACME_SERVER
 
 echo "Reloading NGINX with real certificate"
 docker-compose restart nginx
