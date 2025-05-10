@@ -179,12 +179,24 @@ echo ".flarum.env file templated"
 ## CERTIFICATES --------------------------------
 # Generate a temporary self-signed cert so Nginx can start
 CERTS_DIR="/opt/flarum-data/certs"
-mkdir -p "$CERTS_DIR/live/$SUBDOMAIN"
-chmod 755 "$CERTS_DIR"
-openssl req -x509 -nodes -days 2 -newkey rsa:2048 \
-  -keyout $CERTS_DIR/live/$SUBDOMAIN/privkey.pem \
-  -out $CERTS_DIR/live/$SUBDOMAIN/fullchain.pem \
-  -subj "/CN=${SUBDOMAIN}"
+CERT_PATH="$CERTS_DIR/live/$SUBDOMAIN/fullchain.pem"
+
+# Check if a valid certificate already exists
+if [[ -f "$CERT_PATH" ]]; then
+  if openssl x509 -in "$CERT_PATH" -noout -issuer 2>/dev/null | grep -q "Let's Encrypt"; then
+    echo "✅ Valid certificate already in place (issuer: $(openssl x509 -in "$CERT_PATH" -noout -issuer)) — skipping bootstrap cert"
+  else
+    echo "⚠️ Existing cert is not trusted (likely self-signed); will replace"
+  fi
+else
+  echo "🛠 No certificate found — generating bootstrap self-signed cert"
+  mkdir -p "$CERTS_DIR/live/$SUBDOMAIN"
+  chmod 755 "$CERTS_DIR"
+  openssl req -x509 -nodes -days 2 -newkey rsa:2048 \
+    -keyout "$CERTS_DIR/live/$SUBDOMAIN/privkey.pem" \
+    -out "$CERTS_DIR/live/$SUBDOMAIN/fullchain.pem" \
+    -subj "/CN=${SUBDOMAIN}"
+fi
 
 echo "📝 Diagnostic: listing bootstrap certs directory on host:"
 ls -l $CERTS_DIR/live/"$SUBDOMAIN"
@@ -259,8 +271,6 @@ for i in {1..30}; do
 done
 
 # Bootstrap cert deletion logic
-CERT_PATH="$CERTS_DIR/live/$SUBDOMAIN/fullchain.pem"
-
 if [[ -f "$CERT_PATH" ]]; then
   echo "🔍 Checking existing certificate at $CERT_PATH"
 
