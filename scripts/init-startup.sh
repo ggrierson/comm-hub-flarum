@@ -26,8 +26,12 @@ if ! blkid "$DISK_DEVICE" &>/dev/null; then
 fi
 
 # Mount the disk
-mount -o discard,defaults "$DISK_DEVICE" "$MOUNT_POINT"
-echo "Mounted disk at $MOUNT_POINT"
+if ! mountpoint -q "$MOUNT_POINT"; then
+  mount -o discard,defaults "$DISK_DEVICE" "$MOUNT_POINT"
+  echo "✅ Mounted $DISK_DEVICE at $MOUNT_POINT"
+else
+  echo "🔁 $MOUNT_POINT already mounted — skipping"
+fi
 
 # Ensure it mounts on reboot
 grep -q "^$DISK_DEVICE $MOUNT_POINT" /etc/fstab || echo "$DISK_DEVICE $MOUNT_POINT $FS_TYPE discard,defaults,nofail 0 2" >> /etc/fstab
