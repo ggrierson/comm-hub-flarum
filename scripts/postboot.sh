@@ -270,51 +270,45 @@ for i in {1..30}; do
   sleep 2
 done
 
-# Bootstrap cert deletion logic
-if [[ -f "$CERT_PATH" ]]; then
-  echo "🔍 Checking existing certificate at $CERT_PATH"
+# Decide if we should request a new certificate
+NEEDS_NEW_CERT=false
 
-  ISSUER=$(openssl x509 -in "$CERT_PATH" -noout -issuer 2>/dev/null || echo "unknown")
-  SUBJECT=$(openssl x509 -in "$CERT_PATH" -noout -subject 2>/dev/null || echo "unknown")
-  IS_SELF_SIGNED=$(openssl x509 -in "$CERT_PATH" -noout -issuer -subject 2>/dev/null | \
-    awk -F'= ' '/issuer=/{issuer=$NF} /subject=/{subject=$NF} END{print issuer==subject}')
+if [[ ! -f "$CERT_PATH" ]]; then
+  echo "📭 No existing cert found — will attempt to issue one"
+  NEEDS_NEW_CERT=true
+elif echo "$ISSUER" | grep -qi "Fake LE Intermediate"; then
+  echo "📭 Detected staging certificate — will replace with real one"
+  NEEDS_NEW_CERT=true
+elif [[ "$IS_SELF_SIGNED" == "1" ]]; then
+  echo "📭 Detected self-signed certificate — will replace"
+  NEEDS_NEW_CERT=true
+else
+  echo "✅ Valid certificate already in place (issuer: $ISSUER), skipping new cert request"
+fi
 
-  if echo "$ISSUER" | grep -qi "Fake LE Intermediate"; then
-    echo "🧹 Detected Let's Encrypt STAGING certificate (Fake LE Intermediate), replacing it"
-    rm -rf "$CERTS_DIR/live/$SUBDOMAIN"
-  elif [[ "$IS_SELF_SIGNED" == "1" ]]; then
-    echo "🧹 Detected self-signed bootstrap certificate, replacing it"
-    rm -rf "$CERTS_DIR/live/$SUBDOMAIN"
+if [[ "$NEEDS_NEW_CERT" == "true" ]]; then
+  echo "Requesting real certificate for $SUBDOMAIN"
+  if [[ "${LETSENCRYPT_ENV_STAGING,,}" == "true" ]]; then
+    ACME_SERVER="--server https://acme-staging-v02.api.letsencrypt.org/directory"
+    echo "🧪 Using Let’s Encrypt STAGING environment"
   else
-    echo "✅ Valid certificate already in place (issuer: $ISSUER), keeping it"
+    ACME_SERVER=""
+    echo "✅ Using Let’s Encrypt PRODUCTION environment"
   fi
-else
-  echo "ℹ️ No existing certificate found — will attempt to issue one"
+
+  retry docker run --rm \
+    -v "$CERTS_DIR":/var/www/certbot \
+    -v "$CERTS_DIR":/etc/letsencrypt \
+    certbot/certbot certonly \
+      --webroot -w /var/www/certbot \
+      --email "$SECRET_CERTBOT_EMAIL" \
+      -d "$SUBDOMAIN" \
+      --agree-tos --non-interactive \
+      $ACME_SERVER
+
+  echo "Reloading NGINX with real certificate"
+  docker-compose restart nginx
 fi
-
-# Request the Let’s Encrypt certificate
-echo "Requesting real certificate for $SUBDOMAIN"
-# Determine Let’s Encrypt server endpoint (staging/prod)
-if [[ "${LETSENCRYPT_ENV_STAGING,,}" == "true" ]]; then
-  ACME_SERVER="--server https://acme-staging-v02.api.letsencrypt.org/directory"
-  echo "🧪 Using Let’s Encrypt STAGING environment"
-else
-  ACME_SERVER=""
-  echo "✅ Using Let’s Encrypt PRODUCTION environment"
-fi
-
-retry docker run --rm \
-  -v "$CERTS_DIR":/var/www/certbot \
-  -v "$CERTS_DIR":/etc/letsencrypt \
-  certbot/certbot certonly \
-    --webroot -w /var/www/certbot \
-    --email "$SECRET_CERTBOT_EMAIL" \
-    -d "$SUBDOMAIN" \
-    --agree-tos --non-interactive \
-    $ACME_SERVER
-
-echo "Reloading NGINX with real certificate"
-docker-compose restart nginx
 
 touch "$MARKER"
 
