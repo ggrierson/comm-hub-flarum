@@ -11,9 +11,8 @@ services:
      - /opt/flarum-data/extensions:/flarum/app/extensions:rw
      - /opt/flarum-data/storage/logs:/flarum/app/storage/logs:rw
     env_file:
-        - .env
+        - .flarum.env
     environment:
-      - DEBUG=false
       - FLARUM_ADMIN_USER=admin
       - FLARUM_ADMIN_PASS="${FLARUM_ADMIN_PASS}"
       - FLARUM_TITLE="Forum Hub"
@@ -32,7 +31,7 @@ services:
     container_name: flarum_db
     restart: always
     env_file:
-        - .env
+        - .flarum.env
     environment:
       - MYSQL_DATABASE=flarum
       - MYSQL_USER=flarum

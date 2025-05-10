@@ -90,17 +90,19 @@ if ! command -v gcloud &>/dev/null; then
   echo "Google Cloud SDK installed"
 fi
 
-echo "Retrieving secrets"
+# Setting env vars
 PROJECT_ID="flarum-oss-forum"
+# SUBDOMAIN="forum-hub.team-apps.net" - this should be sourced in the postboot env now.
+
+echo "Retrieving secrets"
 GITHUB_TOKEN=$(retry gcloud secrets versions access latest --secret=github-token --project=$PROJECT_ID)
-SUBDOMAIN="forum-hub.team-apps.net"
-CERTBOT_EMAIL=$(retry gcloud secrets versions access latest --secret=certbot-email --project=$PROJECT_ID)
+SECRET_CERTBOT_EMAIL=$(retry gcloud secrets versions access latest --secret=certbot-email --project=$PROJECT_ID)
 FLARUM_DB_PASSWORD=$(retry gcloud secrets versions access latest --secret=flarum-db-password --project=$PROJECT_ID)
 FLARUM_ADMIN_PASSWORD=$(retry gcloud secrets versions access latest --secret=flarum-admin-password --project=$PROJECT_ID)
 SMTP_USER=$(retry gcloud secrets versions access latest --secret=smtp-user --project=$PROJECT_ID)
 SMTP_PASS=$(retry gcloud secrets versions access latest --secret=smtp-pass --project=$PROJECT_ID)
 SMTP_MAIL_FROM=$(retry gcloud secrets versions access latest --secret=smtp-mail-from --project=$PROJECT_ID)
-echo "secrets retrieved: GITHUB_TOKEN, CERTBOT_EMAIL, FLARUM_DB_PASSWORD, FLARUM_ADMIN_PASSWORD, SMTP_USER, SMTP_PASS, SMTP_MAIL_FROM"
+echo "secrets retrieved: GITHUB_TOKEN, SECRET_CERTBOT_EMAIL, FLARUM_DB_PASSWORD, FLARUM_ADMIN_PASSWORD, SMTP_USER, SMTP_PASS, SMTP_MAIL_FROM"
 
 ## CLONE REPO --------------------------------
 # Configure .netrc for Git authentication
@@ -139,17 +141,25 @@ rm -f /root/.netrc
 
 ## CREATE ENV --------------------------------
 # Template environment file
-echo "Templating environment"
-cp .env.template .env
-retry sed -i "s|{{SUBDOMAIN}}|${SUBDOMAIN//&/\\&}|g" .env
-retry sed -i "s|{{DB_PASSWORD}}|${FLARUM_DB_PASSWORD//&/\\&}|g" .env
-retry sed -i "s|{{ADMIN_PASSWORD}}|${FLARUM_ADMIN_PASSWORD//&/\\&}|g" .env
-retry sed -i "s|{{ADMIN_EMAIL}}|${CERTBOT_EMAIL//&/\\&}|g" .env
-retry sed -i "s|{{CERTBOT_EMAIL}}|${CERTBOT_EMAIL//&/\\&}|g" .env
-retry sed -i "s|{{SMTP_USER}}|${SMTP_USER//&/\\&}|g" .env
-retry sed -i "s|{{SMTP_PASS}}|${SMTP_PASS//&/\\&}|g" .env
-retry sed -i "s|{{SMTP_MAIL_FROM}}|${SMTP_MAIL_FROM//&/\\&}|g" .env
-echo "environment file templated"
+echo "Templating .flarum.env"
+cp .flarum.env.template .flarum.env
+retry sed -i "s|{{FORUM_SUBDOMAIN}}|${SUBDOMAIN//&/\\&}|g" .flarum.env
+retry sed -i "s|{{DB_PASSWORD}}|${FLARUM_DB_PASSWORD//&/\\&}|g" .flarum.env
+retry sed -i "s|{{ADMIN_PASSWORD}}|${FLARUM_ADMIN_PASSWORD//&/\\&}|g" .flarum.env
+retry sed -i "s|{{ADMIN_EMAIL}}|${SECRET_CERTBOT_EMAIL//&/\\&}|g" .flarum.env
+retry sed -i "s|{{SMTP_USER}}|${SMTP_USER//&/\\&}|g" .flarum.env
+retry sed -i "s|{{SMTP_PASS}}|${SMTP_PASS//&/\\&}|g" .flarum.env
+retry sed -i "s|{{SMTP_MAIL_FROM}}|${SMTP_MAIL_FROM//&/\\&}|g" .flarum.env
+echo ".flarum.env file templated"
+
+# --- POSTBOOT ENVIRONMENT SETUP ---
+echo "Templating .postboot.env"
+cp .postboot.env.template .postboot.env
+set -a
+source .postboot.env
+set +a
+echo "Loaded postboot env: SUBDOMAIN=$SUBDOMAIN, STAGING=$LETSENCRYPT_ENV_STAGING"
+
 
 ## CERTIFICATES --------------------------------
 # Generate a temporary self-signed cert so Nginx can start
@@ -233,12 +243,14 @@ retry docker run --rm \
   -v "$CERTS_DIR":/etc/letsencrypt \
   certbot/certbot certonly \
     --webroot -w /var/www/certbot \
-    --email "$CERTBOT_EMAIL" \
+    --email "$SECRET_CERTBOT_EMAIL" \
     -d "$SUBDOMAIN" \
     --agree-tos --non-interactive \
     $ACME_SERVER
 
 echo "Reloading NGINX with real certificate"
 docker-compose restart nginx
+
+touch "$MARKER"
 
 echo "postboot.sh: complete at $(date -Is)"
