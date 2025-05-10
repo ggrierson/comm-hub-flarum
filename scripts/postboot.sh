@@ -258,9 +258,26 @@ for i in {1..30}; do
   sleep 2
 done
 
-# Remove the bootstrap self-signed certificates so Certbot will request a real one
-echo "🧹 Removing bootstrap certificates for $SUBDOMAIN"
-rm -rf "$CERTS_DIR/live/$SUBDOMAIN"
+# Bootstrap cert deletion logic
+CERT_PATH="$CERTS_DIR/live/$SUBDOMAIN/fullchain.pem"
+
+if [[ -f "$CERT_PATH" ]]; then
+  echo "🔍 Checking existing certificate at $CERT_PATH"
+  ISSUER=$(openssl x509 -in "$CERT_PATH" -noout -issuer 2>/dev/null || echo "unknown")
+  SUBJECT=$(openssl x509 -in "$CERT_PATH" -noout -subject 2>/dev/null || echo "unknown")
+
+  if echo "$ISSUER" | grep -qi "Fake LE Intermediate"; then
+    echo "🧹 Detected Let's Encrypt STAGING certificate (Fake LE Intermediate), replacing it"
+    rm -rf "$CERTS_DIR/live/$SUBDOMAIN"
+  elif echo "$ISSUER" | grep -qi "self-signed" || echo "$SUBJECT" | grep -q "CN=$SUBDOMAIN"; then
+    echo "🧹 Detected self-signed bootstrap certificate, replacing it"
+    rm -rf "$CERTS_DIR/live/$SUBDOMAIN"
+  else
+    echo "✅ Valid certificate already in place (issuer: $ISSUER), keeping it"
+  fi
+else
+  echo "ℹ️ No existing certificate found — will attempt to issue one"
+fi
 
 # Request the Let’s Encrypt certificate
 echo "Requesting real certificate for $SUBDOMAIN"
