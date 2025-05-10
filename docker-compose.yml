@@ -4,6 +4,7 @@ services:
   flarum:
     image: mondedie/flarum:stable
     container_name: flarum
+    restart: always
     depends_on:
       - mariadb
     volumes:
@@ -40,6 +41,7 @@ services:
   nginx:
     image: nginx:stable-alpine
     container_name: flarum_nginx
+    restart: always
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - /opt/flarum-data/assets:/flarum/app/public/assets:ro
@@ -56,6 +58,7 @@ services:
   certbot:
     image: certbot/certbot
     container_name: certbot
+    restart: always
     build:
       context: .
       dockerfile: docker-certbot.Dockerfile
