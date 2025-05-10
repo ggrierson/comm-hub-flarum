@@ -263,13 +263,16 @@ CERT_PATH="$CERTS_DIR/live/$SUBDOMAIN/fullchain.pem"
 
 if [[ -f "$CERT_PATH" ]]; then
   echo "🔍 Checking existing certificate at $CERT_PATH"
+
   ISSUER=$(openssl x509 -in "$CERT_PATH" -noout -issuer 2>/dev/null || echo "unknown")
   SUBJECT=$(openssl x509 -in "$CERT_PATH" -noout -subject 2>/dev/null || echo "unknown")
+  IS_SELF_SIGNED=$(openssl x509 -in "$CERT_PATH" -noout -issuer -subject 2>/dev/null | \
+    awk -F'= ' '/issuer=/{issuer=$NF} /subject=/{subject=$NF} END{print issuer==subject}')
 
   if echo "$ISSUER" | grep -qi "Fake LE Intermediate"; then
     echo "🧹 Detected Let's Encrypt STAGING certificate (Fake LE Intermediate), replacing it"
     rm -rf "$CERTS_DIR/live/$SUBDOMAIN"
-  elif echo "$ISSUER" | grep -qi "self-signed" || echo "$SUBJECT" | grep -q "CN=$SUBDOMAIN"; then
+  elif [[ "$IS_SELF_SIGNED" == "1" ]]; then
     echo "🧹 Detected self-signed bootstrap certificate, replacing it"
     rm -rf "$CERTS_DIR/live/$SUBDOMAIN"
   else
