@@ -270,6 +270,8 @@ for i in {1..30}; do
   sleep 2
 done
 
+NEEDS_NEW_CERT=false
+
 # Initialize cert metadata safely
 ISSUER=""
 SUBJECT=""
