@@ -270,20 +270,31 @@ for i in {1..30}; do
   sleep 2
 done
 
-# Decide if we should request a new certificate
-NEEDS_NEW_CERT=false
+# Initialize cert metadata safely
+ISSUER=""
+SUBJECT=""
+IS_SELF_SIGNED="0"
 
-if [[ ! -f "$CERT_PATH" ]]; then
+if [[ -f "$CERT_PATH" ]]; then
+  echo "🔍 Checking existing certificate at $CERT_PATH"
+
+  ISSUER=$(openssl x509 -in "$CERT_PATH" -noout -issuer 2>/dev/null || echo "")
+  SUBJECT=$(openssl x509 -in "$CERT_PATH" -noout -subject 2>/dev/null || echo "")
+  IS_SELF_SIGNED=$(openssl x509 -in "$CERT_PATH" -noout -issuer -subject 2>/dev/null | \
+    awk -F'= ' '/issuer=/{issuer=$NF} /subject=/{subject=$NF} END{print issuer==subject}')
+
+  if echo "$ISSUER" | grep -qi "Fake LE Intermediate"; then
+    echo "📭 Detected staging certificate — will replace with real one"
+    NEEDS_NEW_CERT=true
+  elif [[ "$IS_SELF_SIGNED" == "1" ]]; then
+    echo "📭 Detected self-signed certificate — will replace"
+    NEEDS_NEW_CERT=true
+  else
+    echo "✅ Valid certificate already in place (issuer: $ISSUER), skipping new cert request"
+  fi
+else
   echo "📭 No existing cert found — will attempt to issue one"
   NEEDS_NEW_CERT=true
-elif echo "$ISSUER" | grep -qi "Fake LE Intermediate"; then
-  echo "📭 Detected staging certificate — will replace with real one"
-  NEEDS_NEW_CERT=true
-elif [[ "$IS_SELF_SIGNED" == "1" ]]; then
-  echo "📭 Detected self-signed certificate — will replace"
-  NEEDS_NEW_CERT=true
-else
-  echo "✅ Valid certificate already in place (issuer: $ISSUER), skipping new cert request"
 fi
 
 if [[ "$NEEDS_NEW_CERT" == "true" ]]; then
