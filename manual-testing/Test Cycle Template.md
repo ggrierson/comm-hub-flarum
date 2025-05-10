@@ -38,13 +38,58 @@ This test plan validates the following core tenets of your deployment:
 ## ✅ Phase 2: Critical Recovery Tests
 
 * [ ] Delete and re-create boot disk, reuse data disk
+
+  <details>
+    <summary>steps</summary>
+    <p>Use <code>terraform taint google_compute_instance.flarum_vm</code> to mark the VM for recreation.</p>
+    <p>Then run <code>terraform apply</code> to destroy and recreate just the VM (and boot disk), while preserving the data disk and IP.</p>
+    <p>This ensures startup scripts are reapplied and Terraform state remains consistent.</p>
+  </details>
+  </details>
+
 * [ ] Validate automated recovery of forum
+
+  <details>
+    <summary>steps</summary>
+    <p>Visit <code>https://forum-hub.team-apps.net</code></p>
+    <p>Confirm that users, posts, and site config are intact</p>
+    <p>Check that containers are running with <code>docker ps -a</code></p>
+  </details>
+
 * [ ] Manually install prod cert and reboot
+
+  <details>
+    <summary>steps</summary>
+    <p>Run <code>certbot certonly</code> inside Docker with production endpoint</p>
+    <p>If the cert ends up in a <code>-0001</code> path, move it into the expected directory</p>
+    <p>Restart the VM and confirm NGINX is serving the correct certificate</p>
+  </details>
+
 * [ ] Cert is preserved post-reboot
-* [ ] Run `docker kill flarum`, recover with `docker-compose up -d`
+
+  <details>
+    <summary>steps</summary>
+    <p>After a reboot, run <code>openssl x509 -in fullchain.pem -noout -issuer</code></p>
+    <p>Confirm the certificate is still valid and issued by Let's Encrypt</p>
+  </details>
+
+* [ ] Run <code>docker kill flarum</code>, recover with <code>docker-compose up -d</code>
+
+  <details>
+    <summary>steps</summary>
+    <p>Run <code>docker kill flarum</code> to simulate a service crash</p>
+    <p>Run <code>docker-compose up -d</code> to bring the container back up</p>
+    <p>Verify the forum works and data is intact</p>
+  </details>
+
 * [ ] DNS update propagates correctly if temporarily changed
 
----
+  <details>
+    <summary>steps</summary>
+    <p>Temporarily point the DNS A record to another IP</p>
+    <p>Then revert it back to the original IP</p>
+    <p>Ensure the forum becomes reachable again shortly after DNS change</p>
+  </details>
 
 ## ✅ Phase 3: Idempotency / Re-runs
 
