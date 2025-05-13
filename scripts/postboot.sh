@@ -182,20 +182,17 @@ CERTS_DIR="/opt/flarum-data/certs"
 CERT_PATH="$CERTS_DIR/live/$SUBDOMAIN/fullchain.pem"
 
 # Check if a valid certificate already exists
-if [[ -f "$CERT_PATH" ]]; then
-  if openssl x509 -in "$CERT_PATH" -noout -issuer 2>/dev/null | grep -q "Let's Encrypt"; then
-    echo "✅ Valid certificate already in place (issuer: $(openssl x509 -in "$CERT_PATH" -noout -issuer)) — skipping bootstrap cert"
-  else
-    echo "⚠️ Existing cert is not trusted (likely self-signed); will replace"
-  fi
-else
-  echo "🛠 No certificate found — generating bootstrap self-signed cert"
+echo "🔍 Checking for existing certificate at $CERT_PATH"
+if [[ ! -f "$CERT_PATH" ]]; then
+  echo "📭 No cert found, generating temporary self-signed cert for NGINX"
   mkdir -p "$CERTS_DIR/live/$SUBDOMAIN"
   chmod 755 "$CERTS_DIR"
   openssl req -x509 -nodes -days 2 -newkey rsa:2048 \
     -keyout "$CERTS_DIR/live/$SUBDOMAIN/privkey.pem" \
     -out "$CERTS_DIR/live/$SUBDOMAIN/fullchain.pem" \
     -subj "/CN=${SUBDOMAIN}"
+else
+  echo "✔ Cert already exists, skipping bootstrap cert generation"
 fi
 
 echo "📝 Diagnostic: listing bootstrap certs directory on host:"
@@ -300,7 +297,9 @@ else
 fi
 
 if [[ "$NEEDS_NEW_CERT" == "true" ]]; then
-  echo "Requesting real certificate for $SUBDOMAIN"
+  echo "🚮 Deleting temporary certs before Certbot issues real cert for $SUBDOMAIN"
+  rm -rf "$CERTS_DIR/live/$SUBDOMAIN"
+
   if [[ "${LETSENCRYPT_ENV_STAGING,,}" == "true" ]]; then
     ACME_SERVER="--server https://acme-staging-v02.api.letsencrypt.org/directory"
     echo "🧪 Using Let’s Encrypt STAGING environment"
@@ -319,7 +318,7 @@ if [[ "$NEEDS_NEW_CERT" == "true" ]]; then
       --agree-tos --non-interactive \
       $ACME_SERVER
 
-  echo "Reloading NGINX with real certificate"
+  echo "🔁 Reloading NGINX to apply new certificate"
   docker-compose restart nginx
 fi
 
