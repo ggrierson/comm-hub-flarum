@@ -134,11 +134,26 @@ GIT_TERMINAL_PROMPT=0 retry git ls-remote https://github.com/ggrierson/comm-hub-
 echo "🕵️‍♂️ Contents of $(pwd):"
 ls -lA
 
-echo "cloning deployment repository if necessary"
-if [ ! -d "$REPO_DIR/.git" ]; then
+echo "🔁 Checking if repo already exists at $REPO_DIR"
+if [[ ! -d "$REPO_DIR/.git" ]]; then
+  echo "📥 Cloning repository to $REPO_DIR"
   retry git clone https://github.com/ggrierson/comm-hub-flarum.git "$REPO_DIR"
+else
+  echo "✔ Repo already exists"
 fi
-echo "repository clone/setup complete"
+
+if [[ -n "${GIT_BRANCH:-}" ]]; then
+  echo "🔁 Switching to branch: $GIT_BRANCH"
+  retry git fetch origin
+  retry git checkout "$GIT_BRANCH"
+  retry git pull origin "$GIT_BRANCH"
+else
+  echo "ℹ️ GIT_BRANCH not set — staying on current/default branch"
+fi
+
+# ✅ Log current git branch
+echo "📍 Active Git branch: $(git rev-parse --abbrev-ref HEAD)"
+
 rm -f /root/.netrc
 
 ## MARK: CREATE ENV
