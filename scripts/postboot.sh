@@ -181,8 +181,12 @@ echo ".flarum.env file templated"
 CERTS_DIR="/opt/flarum-data/certs"
 CERT_PATH="$CERTS_DIR/live/$SUBDOMAIN/fullchain.pem"
 
-# Check if a valid certificate already exists
-echo "🔍 Checking for existing certificate at $CERT_PATH"
+# Ensure ACME challenge webroot is writable and exists
+echo "➤ Creating webroot for HTTP-01 challenge"
+mkdir -p "$CERTS_DIR/.well-known/acme-challenge"
+chmod 755 "$CERTS_DIR/.well-known" "$CERTS_DIR/.well-known/acme-challenge"
+
+# Ensure a cert exists for NGINX to start
 if [[ ! -f "$CERT_PATH" ]]; then
   echo "📭 No cert found, generating temporary self-signed cert for NGINX"
   mkdir -p "$CERTS_DIR/live/$SUBDOMAIN"
@@ -198,10 +202,6 @@ fi
 echo "📝 Diagnostic: listing bootstrap certs directory on host:"
 ls -l $CERTS_DIR/live/"$SUBDOMAIN"
 
-# Ensure ACME challenge webroot is writable and exists
-echo "➤ Creating webroot for HTTP-01 challenge"
-mkdir -p "$CERTS_DIR/.well-known/acme-challenge"
-chmod 755 "$CERTS_DIR/.well-known" "$CERTS_DIR/.well-known/acme-challenge"
 
 # Wait until .flarum.env is fully written and contains the required value
 wait_for_env_var() {
@@ -297,8 +297,12 @@ else
 fi
 
 if [[ "$NEEDS_NEW_CERT" == "true" ]]; then
-  echo "🚮 Deleting temporary certs before Certbot issues real cert for $SUBDOMAIN"
-  rm -rf "$CERTS_DIR/live/$SUBDOMAIN"
+  if [[ -L "$CERTS_DIR/live/$SUBDOMAIN" ]]; then
+    echo "🔗 Skipping deletion: cert dir is a symlink managed by certbot"
+  else
+    echo "🚮 Deleting unmanaged cert directory before requesting new cert"
+    rm -rf "$CERTS_DIR/live/$SUBDOMAIN"
+  fi
 
   if [[ "${LETSENCRYPT_ENV_STAGING,,}" == "true" ]]; then
     ACME_SERVER="--server https://acme-staging-v02.api.letsencrypt.org/directory"
@@ -320,6 +324,12 @@ if [[ "$NEEDS_NEW_CERT" == "true" ]]; then
 
   echo "🔁 Reloading NGINX to apply new certificate"
   docker-compose restart nginx
+fi
+
+# Diagnostic: list active renewal configs (optional)
+if [[ -d "$CERTS_DIR/renewal" ]]; then
+  echo "🧾 Renewal config files:"
+  ls -l "$CERTS_DIR/renewal"
 fi
 
 touch "$MARKER"
