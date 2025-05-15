@@ -90,6 +90,7 @@ if ! command -v gcloud &>/dev/null; then
   echo "Google Cloud SDK installed"
 fi
 
+## MARK: ENV + SECRETS
 # Setting env vars
 PROJECT_ID="flarum-oss-forum"
 # SUBDOMAIN="forum-hub.team-apps.net" - this should be sourced in the postboot env now.
@@ -104,6 +105,7 @@ SMTP_PASS=$(retry gcloud secrets versions access latest --secret=smtp-pass --pro
 SMTP_MAIL_FROM=$(retry gcloud secrets versions access latest --secret=smtp-mail-from --project=$PROJECT_ID)
 echo "secrets retrieved: GITHUB_TOKEN, SECRET_CERTBOT_EMAIL, FLARUM_DB_PASSWORD, FLARUM_ADMIN_PASSWORD, SMTP_USER, SMTP_PASS, SMTP_MAIL_FROM"
 
+## MARK: GIT
 ## CLONE REPO --------------------------------
 # Configure .netrc for Git authentication
 export HOME=/root
@@ -139,6 +141,7 @@ fi
 echo "repository clone/setup complete"
 rm -f /root/.netrc
 
+## MARK: CREATE ENV
 ## CREATE ENV --------------------------------
 # --- POSTBOOT ENVIRONMENT SETUP ---
 echo "Templating .postboot.env"
@@ -176,6 +179,7 @@ retry sed -i "s|{{SMTP_PASS}}|$SMTP_PASS_ESCAPED|g" .flarum.env
 retry sed -i "s|{{SMTP_MAIL_FROM}}|$SMTP_MAIL_FROM_ESCAPED|g" .flarum.env
 echo ".flarum.env file templated"
 
+## MARK: INITIAL CERTS
 ## CERTIFICATES --------------------------------
 CERTS_DIR="/opt/flarum-data/certs"
 LIVE_DIR="$CERTS_DIR/live/$SUBDOMAIN"
@@ -227,6 +231,7 @@ wait_for_env_var .flarum.env "FLARUM_ADMIN_PASS"
 echo "📄 Final contents of .flarum.env:"
 cat .flarum.env
 
+## MARK: DOCKER
 ## DOCKER --------------------------------
 # Run Docker Compose
 echo "🧭 PWD before docker-compose: $(pwd)"
@@ -258,6 +263,7 @@ echo test > /opt/flarum-data/certs/.well-known/acme-challenge/healthcheck
 curl -v http://localhost/.well-known/acme-challenge/healthcheck || \
   echo "❌ Nginx still not serving the file!"
 
+## MARK: NEW CERTS
 ## NEW CERTIFICATES ----------------------------
 # Wait until NGINX is serving the HTTP-01 challenge endpoint
 echo "Waiting for NGINX to serve HTTP challenge"
