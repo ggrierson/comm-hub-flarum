@@ -70,35 +70,48 @@ done
 if [[ "$BOOTSTRAP_FIRST_RUN" == "true" ]]; then
   echo "⚙️ Running one-time initialization logic (e.g., package installs, Docker setup)"
   # Place all logic that should only run on first boot here
-wait_for_apt
-retry apt-get update
-
-echo "checking Docker installation"
-# Install Docker, Compose, Git, curl, unzip if needed
-if ! command -v docker &>/dev/null; then
   wait_for_apt
-  retry apt-get install -y docker.io docker-compose git curl unzip
-  retry systemctl enable docker
-  retry systemctl start docker
-  wait_for_service docker
-  echo "Docker installed/enabled and daemon started"
-fi
+  retry apt-get update
 
-echo "checking Google Cloud SDK installation"
-# Install Google Cloud SDK if not already present
-if ! command -v gcloud &>/dev/null; then
-  wait_for_apt
-  retry apt-get install -y apt-transport-https ca-certificates gnupg curl
-  retry curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg
-  echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee /etc/apt/sources.list.d/google-cloud-sdk.list
-  retry apt-get install -y google-cloud-cli
-  echo "Google Cloud SDK installed"
+  echo "checking Docker installation"
+  # Install Docker, Compose, Git, curl, unzip if needed
+  if ! command -v docker &>/dev/null; then
+    wait_for_apt
+    retry apt-get install -y docker.io docker-compose git curl unzip
+    retry systemctl enable docker
+    retry systemctl start docker
+    wait_for_service docker
+    echo "Docker installed/enabled and daemon started"
+  fi
+
+  echo "checking Google Cloud SDK installation"
+  # Install Google Cloud SDK if not already present
+  if ! command -v gcloud &>/dev/null; then
+    wait_for_apt
+    retry apt-get install -y apt-transport-https ca-certificates gnupg curl
+    retry curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg
+    echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee /etc/apt/sources.list.d/google-cloud-sdk.list
+    retry apt-get install -y google-cloud-cli
+    echo "Google Cloud SDK installed"
   fi
 else
   echo "🔁 Skipping one-time setup logic — already initialized"
 fi
 
 ## MARK: ENV + SECRETS
+# Safe initialization of Terraform-injected vars
+GIT_BRANCH="${GIT_BRANCH:-}"
+SUBDOMAIN="${SUBDOMAIN:-forum-hub.team-apps.net}"
+LETSENCRYPT_ENV_STAGING="${LETSENCRYPT_ENV_STAGING:-false}"
+CLEAN_UNUSED_CERTS="${CLEAN_UNUSED_CERTS:-false}"
+
+# ✅ Diagnostic: Show active configuration
+echo "🌿 Terraform-injected config vars:"
+echo "  - GIT_BRANCH=$GIT_BRANCH"
+echo "  - SUBDOMAIN=$SUBDOMAIN"
+echo "  - LETSENCRYPT_ENV_STAGING=$LETSENCRYPT_ENV_STAGING"
+echo "  - CLEAN_UNUSED_CERTS=$CLEAN_UNUSED_CERTS"
+
 # Setting env vars
 PROJECT_ID="flarum-oss-forum"
 # SUBDOMAIN="forum-hub.team-apps.net" - this should be sourced in the postboot env now.
@@ -166,14 +179,6 @@ rm -f /root/.netrc
 
 ## MARK: CREATE ENV
 ## CREATE ENV --------------------------------
-# --- POSTBOOT ENVIRONMENT SETUP ---
-echo "Templating .postboot.env"
-cp .postboot.env.template .postboot.env
-set -a
-source .postboot.env
-set +a
-echo "Loaded postboot env: SUBDOMAIN=$SUBDOMAIN, STAGING=$LETSENCRYPT_ENV_STAGING, CLEAN_UNUSED_CERTS=$CLEAN_UNUSED_CERTS"
-
 # Template environment file
 echo "Templating .flarum.env"
 cp .flarum.env.template .flarum.env
