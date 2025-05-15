@@ -332,6 +332,13 @@ if [[ "$NEEDS_NEW_CERT" == "true" ]]; then
   echo "🔁 Reloading NGINX to apply new certificate"
   docker-compose restart nginx
 
+  # 🔗 Log current symlink used by NGINX
+  if [[ -L "$CURRENT_LINK" ]]; then
+    echo "🔗 Current symlink: $CURRENT_LINK -> $(readlink -f "$CURRENT_LINK")"
+  else
+    echo "⚠️  $CURRENT_LINK is not a symlink or is broken"
+  fi
+
   # 🧹 Cleanup: Warn about unreferenced numbered certificate directories
   # This always logs warnings, but deletion is behind a feature flag.
   echo "🔍 Scanning for unused numbered cert directories..."
@@ -346,6 +353,7 @@ if [[ "$NEEDS_NEW_CERT" == "true" ]]; then
         rm -rf "$d"
       fi
     fi
+    echo "🔗 Symlink status: $d -> $(readlink -f "$d" || echo '[not a symlink]')"
   done
 fi
 
