@@ -146,7 +146,7 @@ cp .postboot.env.template .postboot.env
 set -a
 source .postboot.env
 set +a
-echo "Loaded postboot env: SUBDOMAIN=$SUBDOMAIN, STAGING=$LETSENCRYPT_ENV_STAGING"
+echo "Loaded postboot env: SUBDOMAIN=$SUBDOMAIN, STAGING=$LETSENCRYPT_ENV_STAGING, CLEAN_UNUSED_CERTS=$CLEAN_UNUSED_CERTS"
 
 # Template environment file
 echo "Templating .flarum.env"
@@ -331,6 +331,22 @@ if [[ "$NEEDS_NEW_CERT" == "true" ]]; then
 
   echo "🔁 Reloading NGINX to apply new certificate"
   docker-compose restart nginx
+
+  # 🧹 Cleanup: Warn about unreferenced numbered certificate directories
+  # This always logs warnings, but deletion is behind a feature flag.
+  echo "🔍 Scanning for unused numbered cert directories..."
+  for d in "$CERTS_DIR/live/"$SUBDOMAIN-*; do
+    [[ -d "$d" ]] || continue
+    config_name="$(basename "$d")"
+    config_file="$CERTS_DIR/renewal/${config_name}.conf"
+    if [[ ! -f "$config_file" ]]; then
+      echo "⚠️ Found unused numbered cert dir: $d — not referenced by any renewal config"
+      if [[ "${CLEAN_UNUSED_CERTS:-false}" == "true" ]]; then
+        echo "🗑️  CLEAN_UNUSED_CERTS enabled — deleting: $d"
+        rm -rf "$d"
+      fi
+    fi
+  done
 fi
 
 # Diagnostic: list active renewal configs (optional)
