@@ -177,9 +177,14 @@ retry sed -i "s|{{SMTP_MAIL_FROM}}|$SMTP_MAIL_FROM_ESCAPED|g" .flarum.env
 echo ".flarum.env file templated"
 
 ## CERTIFICATES --------------------------------
-# Generate a temporary self-signed cert so Nginx can start
 CERTS_DIR="/opt/flarum-data/certs"
-CERT_PATH="$CERTS_DIR/live/$SUBDOMAIN/fullchain.pem"
+LIVE_DIR="$CERTS_DIR/live/$SUBDOMAIN"
+BOOTSTRAP_DIR="$CERTS_DIR/bootstrap/$SUBDOMAIN"
+CURRENT_LINK="$CERTS_DIR/current"
+CERT_PATH="$CURRENT_LINK/fullchain.pem"
+
+mkdir -p "$CERTS_DIR"
+chmod 755 "$CERTS_DIR"
 
 # Ensure ACME challenge webroot is writable and exists
 echo "➤ Creating webroot for HTTP-01 challenge"
@@ -189,16 +194,15 @@ chmod 755 "$CERTS_DIR/.well-known" "$CERTS_DIR/.well-known/acme-challenge"
 # Ensure a cert exists for NGINX to start
 if [[ ! -f "$CERT_PATH" ]]; then
   echo "📭 No cert found, generating temporary self-signed cert for NGINX"
-  mkdir -p "$CERTS_DIR/live/$SUBDOMAIN"
-  chmod 755 "$CERTS_DIR"
+  mkdir -p "$BOOTSTRAP_DIR"
   openssl req -x509 -nodes -days 2 -newkey rsa:2048 \
-    -keyout "$CERTS_DIR/live/$SUBDOMAIN/privkey.pem" \
-    -out "$CERTS_DIR/live/$SUBDOMAIN/fullchain.pem" \
+    -keyout "$BOOTSTRAP_DIR/privkey.pem" \
+    -out "$BOOTSTRAP_DIR/fullchain.pem" \
     -subj "/CN=${SUBDOMAIN}"
+  ln -sfn "$BOOTSTRAP_DIR" "$CURRENT_LINK"
 else
-  echo "✔ Cert already exists, skipping bootstrap cert generation"
+  echo "✔ Cert already exists at $CERT_PATH, skipping bootstrap cert generation"
 fi
-
 echo "📝 Diagnostic: listing bootstrap certs directory on host:"
 ls -l $CERTS_DIR/live/"$SUBDOMAIN"
 
@@ -297,11 +301,11 @@ else
 fi
 
 if [[ "$NEEDS_NEW_CERT" == "true" ]]; then
-  if [[ -L "$CERTS_DIR/live/$SUBDOMAIN" ]]; then
+  if [[ -L "$LIVE_DIR" ]]; then
     echo "🔗 Skipping deletion: cert dir is a symlink managed by certbot"
   else
     echo "🚮 Deleting unmanaged cert directory before requesting new cert"
-    rm -rf "$CERTS_DIR/live/$SUBDOMAIN"
+    rm -rf "$LIVE_DIR"
   fi
 
   if [[ "${LETSENCRYPT_ENV_STAGING,,}" == "true" ]]; then
@@ -321,6 +325,9 @@ if [[ "$NEEDS_NEW_CERT" == "true" ]]; then
       -d "$SUBDOMAIN" \
       --agree-tos --non-interactive \
       $ACME_SERVER
+
+  echo "🔗 Updating current symlink to point to newly issued cert"
+  ln -sfn "$LIVE_DIR" "$CURRENT_LINK"
 
   echo "🔁 Reloading NGINX to apply new certificate"
   docker-compose restart nginx
