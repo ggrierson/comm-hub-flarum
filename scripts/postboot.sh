@@ -4,11 +4,15 @@ set -euo pipefail
 # DEBUG: turn on command-by-command tracing
 set -x
 
-# if we've already run once, bail out immediately
+# Optional marker logic: only skip heavy bootstrap tasks
 MARKER=/opt/bootstrap/.postboot-done
 if [[ -f "$MARKER" ]]; then
-  echo "⏭ postboot.sh: already completed, skipping."
-  exit 0
+  echo "⏭ postboot.sh: initial bootstrap previously completed — continuing with incremental logic"
+  BOOTSTRAP_FIRST_RUN=false
+else
+  echo "🚀 Running full bootstrap for the first time"
+  touch "$MARKER"
+  BOOTSTRAP_FIRST_RUN=true
 fi
 
 # ensure this script is deleted when it exits (even on error)
@@ -62,7 +66,10 @@ for i in {1..10}; do
   sleep 2
 done
 
-echo "Performing initial apt update"
+# Conditional logic for one-time bootstrap tasks
+if [[ "$BOOTSTRAP_FIRST_RUN" == "true" ]]; then
+  echo "⚙️ Running one-time initialization logic (e.g., package installs, Docker setup)"
+  # Place all logic that should only run on first boot here
 wait_for_apt
 retry apt-get update
 
@@ -71,8 +78,6 @@ echo "checking Docker installation"
 if ! command -v docker &>/dev/null; then
   wait_for_apt
   retry apt-get install -y docker.io docker-compose git curl unzip
-
-# Ensure the Docker daemon is enabled and running
   retry systemctl enable docker
   retry systemctl start docker
   wait_for_service docker
@@ -88,6 +93,9 @@ if ! command -v gcloud &>/dev/null; then
   echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee /etc/apt/sources.list.d/google-cloud-sdk.list
   retry apt-get install -y google-cloud-cli
   echo "Google Cloud SDK installed"
+  fi
+else
+  echo "🔁 Skipping one-time setup logic — already initialized"
 fi
 
 ## MARK: ENV + SECRETS
