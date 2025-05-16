@@ -318,8 +318,8 @@ if [[ -f "$CERT_PATH" ]]; then
   IS_SELF_SIGNED=$(openssl x509 -in "$CERT_PATH" -noout -issuer -subject 2>/dev/null | \
     awk -F'= ' '/issuer=/{issuer=$NF} /subject=/{subject=$NF} END{print issuer==subject}')
 
-  if echo "$ISSUER" | grep -qi "Fake LE Intermediate"; then
-    echo "📭 Detected staging certificate — will replace with real one"
+  if echo "$ISSUER" | grep -qi "(STAGING)"; then
+    echo "📭 Detected staging certificate — will replace with production cert"
     NEEDS_NEW_CERT=true
   elif [[ "$IS_SELF_SIGNED" == "1" ]]; then
     echo "📭 Detected self-signed certificate — will replace"
