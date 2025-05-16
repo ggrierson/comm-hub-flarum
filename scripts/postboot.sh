@@ -231,7 +231,7 @@ if [[ ! -f "$CERT_PATH" ]]; then
     -keyout "$BOOTSTRAP_DIR/privkey.pem" \
     -out "$BOOTSTRAP_DIR/fullchain.pem" \
     -subj "/CN=${SUBDOMAIN}"
-  ln -sfn "$BOOTSTRAP_DIR" "$CURRENT_LINK"
+  ln -sfn "bootstrap/$SUBDOMAIN" "$CURRENT_LINK"
 else
   echo "✔ Cert already exists at $CERT_PATH, skipping bootstrap cert generation"
 fi
@@ -389,6 +389,7 @@ if [[ "$NEEDS_NEW_CERT" == "true" ]]; then
     echo "🔗 Symlink status: $d -> $(readlink -f "$d" || echo '[not a symlink]')"
   done
   shopt -u nullglob
+fi
 
 # Diagnostic: list active renewal configs (optional)
 if [[ -d "$CERTS_DIR/renewal" ]]; then
