@@ -236,7 +236,7 @@ else
   echo "✔ Cert already exists at $CERT_PATH, skipping bootstrap cert generation"
 fi
 echo "📝 Diagnostic: listing bootstrap certs directory on host:"
-ls -l $CERTS_DIR/live/"$SUBDOMAIN"
+ls -l "$CURRENT_LINK"
 
 
 # Wait until .flarum.env is fully written and contains the required value
@@ -272,14 +272,12 @@ retry docker-compose up -d
 
 echo "Docker Compose operations complete"
 
-echo "📝 Host certs dir:"
-ls -l $CERTS_DIR/live/"$SUBDOMAIN" || echo "❌ host certs not found"
+echo "📝 Current symlinked dir:"
+ls -l "$CURRENT_LINK" || echo "❌ host certs not found"
 
-echo "📝 Nginx sees certs:"
-docker exec flarum_nginx ls -l /etc/letsencrypt/live/"$SUBDOMAIN" \
+echo "📝 Nginx sees certs at expected symlinked path:"
+docker exec flarum_nginx ls -l /etc/letsencrypt/current \
   || echo "❌ nginx container or path not found"
-
-
 
 # one-off endpoint check to see if nginx is serving the right directory for certbot
 echo "🧪 Verifying ACME webroot inside the running Nginx container…"
@@ -376,7 +374,8 @@ if [[ "$NEEDS_NEW_CERT" == "true" ]]; then
   # 🧹 Cleanup: Warn about unreferenced numbered certificate directories
   # This always logs warnings, but deletion is behind a feature flag.
   echo "🔍 Scanning for unused numbered cert directories..."
-  for d in "$CERTS_DIR/live/"$SUBDOMAIN-*; do
+  shopt -s nullglob
+  for d in "$CERTS_DIR/live/${SUBDOMAIN}-"*; do
     [[ -d "$d" ]] || continue
     config_name="$(basename "$d")"
     config_file="$CERTS_DIR/renewal/${config_name}.conf"
@@ -389,7 +388,7 @@ if [[ "$NEEDS_NEW_CERT" == "true" ]]; then
     fi
     echo "🔗 Symlink status: $d -> $(readlink -f "$d" || echo '[not a symlink]')"
   done
-fi
+  shopt -u nullglob
 
 # Diagnostic: list active renewal configs (optional)
 if [[ -d "$CERTS_DIR/renewal" ]]; then
