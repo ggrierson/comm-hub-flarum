@@ -349,17 +349,28 @@ if [[ "$NEEDS_NEW_CERT" == "true" ]]; then
   fi
 
   retry docker run --rm \
-    -v "$CERTS_DIR":/var/www/certbot \
-    -v "$CERTS_DIR":/etc/letsencrypt \
-    certbot/certbot certonly \
-      --webroot -w /var/www/certbot \
-      --email "$SECRET_CERTBOT_EMAIL" \
-      -d "$SUBDOMAIN" \
-      --agree-tos --non-interactive \
-      $ACME_SERVER
+  -v "$CERTS_DIR":/var/www/certbot \
+  -v "$CERTS_DIR":/etc/letsencrypt \
+  certbot/certbot certonly \
+    --config-dir /etc/letsencrypt \
+    --work-dir /var/www/certbot \
+    --logs-dir /var/www/certbot \
+    --webroot -w /var/www/certbot \
+    --email "$SECRET_CERTBOT_EMAIL" \
+    -d "$SUBDOMAIN" \
+    --agree-tos --non-interactive \
+    $ACME_SERVER
 
   echo "🔗 Updating current symlink to point to newly issued cert"
-  ln -sfn "$LIVE_DIR" "$CURRENT_LINK"
+  NEW_LIVE_DIR=$(find "$CERTS_DIR/live" -maxdepth 1 -type d -name "$SUBDOMAIN*" | sort | tail -n1)
+
+  if [[ -n "$NEW_LIVE_DIR" ]]; then
+    ln -sfn "$(realpath --relative-to="$CERTS_DIR" "$NEW_LIVE_DIR")" "$CURRENT_LINK"
+    echo "🔗 Updated current symlink to: $(readlink -f "$CURRENT_LINK")"
+  else
+    echo "❌ Could not find new live cert dir after issuance"
+    exit 1
+  fi
 
   echo "🔁 Reloading NGINX to apply new certificate"
   docker-compose restart nginx
