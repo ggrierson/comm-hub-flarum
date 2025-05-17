@@ -298,19 +298,24 @@ NEEDS_NEW_CERT=false
 ISSUER=$(openssl x509 -in "$CERT_PATH" -noout -issuer 2>/dev/null || echo "")
 SUBJECT=$(openssl x509 -in "$CERT_PATH" -noout -subject 2>/dev/null || echo "")
 IS_SELF_SIGNED=$(openssl x509 -in "$CERT_PATH" -noout -issuer -subject 2>/dev/null | \
-  awk -F'= ' '/issuer=/{i=$NF} /subject=/{s=$NF} END{print i==s}')
+  awk -F'= ' '/issuer=/{issuer=$NF} /subject=/{subject=$NF} END{print issuer==subject}')
 
-if echo "$ISSUER" | grep -qi "(STAGING)"; then
-  echo "📭 Detected staging certificate — will replace with production cert"
+if [[ -z "$ISSUER" ]]; then
+  echo "📭 No certificate found — issuing new one"
   NEEDS_NEW_CERT=true
 elif [[ "$IS_SELF_SIGNED" == "1" ]]; then
-  echo "📭 Self-signed cert found, will replace"
+  echo "📭 Self-signed certificate detected — replacing with real certificate"
+  NEEDS_NEW_CERT=true
+elif [[ "$LETSENCRYPT_ENV_STAGING" == "false" && "$ISSUER" =~ "\(STAGING\)" ]]; then
+  echo "📭 Detected staging cert but production is enabled — replacing with production cert"
   NEEDS_NEW_CERT=true
 else
-  echo "✅ Valid cert found — issuer: $ISSUER"
+  echo "✅ Valid certificate present (issuer: $ISSUER) — no replacement needed"
 fi
 
-if [[ "$NEEDS_NEW_CERT" == "true" ]]; then
+if [[ "$NEEDS_NEW_CERT" == "false" ]]; then
+  echo "✅ Valid cert found — issuer: $ISSUER"
+else
   echo "🚀 Requesting new certificate"
   ACME_SERVER=""
   if [[ "${LETSENCRYPT_ENV_STAGING,,}" == "true" ]]; then
