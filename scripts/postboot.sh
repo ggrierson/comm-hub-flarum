@@ -210,7 +210,7 @@ echo ".flarum.env file templated"
 ## MARK: INITIAL CERTS
 ## CERTIFICATES --------------------------------
 CERTS_DIR="/opt/flarum-data/certs"
-LIVE_DIR="$CERTS_DIR/live/$SUBDOMAIN"
+LIVE_BASE="$CERTS_DIR/live"
 BOOTSTRAP_DIR="$CERTS_DIR/bootstrap/$SUBDOMAIN"
 CURRENT_LINK="$CERTS_DIR/current"
 CERT_PATH="$CURRENT_LINK/fullchain.pem"
@@ -223,7 +223,7 @@ echo "➤ Creating webroot for HTTP-01 challenge"
 mkdir -p "$CERTS_DIR/.well-known/acme-challenge"
 chmod 755 "$CERTS_DIR/.well-known" "$CERTS_DIR/.well-known/acme-challenge"
 
-# Ensure a cert exists for NGINX to start
+# Ensure a cert exists at CURRENT_LINK for nginx to start
 if [[ ! -f "$CERT_PATH" ]]; then
   echo "📭 No cert found, generating temporary self-signed cert for NGINX"
   mkdir -p "$BOOTSTRAP_DIR"
@@ -231,12 +231,12 @@ if [[ ! -f "$CERT_PATH" ]]; then
     -keyout "$BOOTSTRAP_DIR/privkey.pem" \
     -out "$BOOTSTRAP_DIR/fullchain.pem" \
     -subj "/CN=${SUBDOMAIN}"
-  ln -sfn "bootstrap/$SUBDOMAIN" "$CURRENT_LINK"
+  ln -sfn "$(realpath --relative-to="$CERTS_DIR" "$BOOTSTRAP_DIR")" "$CURRENT_LINK"
 else
   echo "✔ Cert already exists at $CERT_PATH, skipping bootstrap cert generation"
 fi
-echo "📝 Diagnostic: listing bootstrap certs directory on host:"
-ls -l "$CURRENT_LINK"
+echo "📝 Symlink status:"
+ls -l "$CURRENT_LINK" || echo "❌ $CURRENT_LINK is missing or broken"
 
 
 # Wait until .flarum.env is fully written and contains the required value
@@ -260,120 +260,89 @@ echo "📄 Final contents of .flarum.env:"
 cat .flarum.env
 
 ## MARK: DOCKER
-## DOCKER --------------------------------
-# Run Docker Compose
-echo "🧭 PWD before docker-compose: $(pwd)"
-# echo "Listing nginx.conf and certs:"
-# ls -l nginx.conf certs
-
-# Run Docker Compose operations
+echo "🧭 Running Docker Compose"
 retry docker-compose pull
 retry docker-compose up -d
-
 echo "Docker Compose operations complete"
 
 echo "📝 Current symlinked dir:"
 ls -l "$CURRENT_LINK" || echo "❌ host certs not found"
 
-echo "📝 Nginx sees certs at expected symlinked path:"
-docker exec flarum_nginx ls -l /etc/letsencrypt/current \
-  || echo "❌ nginx container or path not found"
 
+echo "📝 Nginx container sees:"
+docker exec flarum_nginx ls -l /etc/letsencrypt/current || echo "❌ Nginx cert path invalid"
+
+echo "🧪 Checking ACME webroot"
 # one-off endpoint check to see if nginx is serving the right directory for certbot
 echo "🧪 Verifying ACME webroot inside the running Nginx container…"
 docker exec flarum_nginx ls -l /var/www/certbot/.well-known/acme-challenge || \
   echo "❌ webroot not visible in nginx!"
 
-echo "🧪 Curling the healthcheck…"
-echo test > /opt/flarum-data/certs/.well-known/acme-challenge/healthcheck
-curl -v http://localhost/.well-known/acme-challenge/healthcheck || \
-  echo "❌ Nginx still not serving the file!"
+echo "🧪 HTTP challenge healthcheck"
+echo test > "$CERTS_DIR/.well-known/acme-challenge/healthcheck"
+curl -v http://localhost/.well-known/acme-challenge/healthcheck || echo "❌ Healthcheck failed. Nginx still not serving the file!"
 
 ## MARK: NEW CERTS
-## NEW CERTIFICATES ----------------------------
-# Wait until NGINX is serving the HTTP-01 challenge endpoint
-echo "Waiting for NGINX to serve HTTP challenge"
+echo "⏳ Waiting for nginx to serve challenge"
 for i in {1..30}; do
   STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost/.well-known/acme-challenge/test-path || echo "")
   if echo "$STATUS" | grep -qE '^[234]'; then
     echo "🟢 NGINX is up and reachable"
     break
   fi
-  echo "⏳ Waiting for NGINX to start... ($i)"
+  echo "⏳ Waiting for NGINX to start… ($i/30)"
   sleep 2
 done
 
 NEEDS_NEW_CERT=false
+ISSUER=$(openssl x509 -in "$CERT_PATH" -noout -issuer 2>/dev/null || echo "")
+SUBJECT=$(openssl x509 -in "$CERT_PATH" -noout -subject 2>/dev/null || echo "")
+IS_SELF_SIGNED=$(openssl x509 -in "$CERT_PATH" -noout -issuer -subject 2>/dev/null | \
+  awk -F'= ' '/issuer=/{i=$NF} /subject=/{s=$NF} END{print i==s}')
 
-# Initialize cert metadata safely
-ISSUER=""
-SUBJECT=""
-IS_SELF_SIGNED="0"
-
-if [[ -f "$CERT_PATH" ]]; then
-  echo "🔍 Checking existing certificate at $CERT_PATH"
-
-  ISSUER=$(openssl x509 -in "$CERT_PATH" -noout -issuer 2>/dev/null || echo "")
-  SUBJECT=$(openssl x509 -in "$CERT_PATH" -noout -subject 2>/dev/null || echo "")
-  IS_SELF_SIGNED=$(openssl x509 -in "$CERT_PATH" -noout -issuer -subject 2>/dev/null | \
-    awk -F'= ' '/issuer=/{issuer=$NF} /subject=/{subject=$NF} END{print issuer==subject}')
-
-  if echo "$ISSUER" | grep -qi "(STAGING)"; then
-    echo "📭 Detected staging certificate — will replace with production cert"
-    NEEDS_NEW_CERT=true
-  elif [[ "$IS_SELF_SIGNED" == "1" ]]; then
-    echo "📭 Detected self-signed certificate — will replace"
-    NEEDS_NEW_CERT=true
-  else
-    echo "✅ Valid certificate already in place (issuer: $ISSUER), skipping new cert request"
-  fi
-else
-  echo "📭 No existing cert found — will attempt to issue one"
+if echo "$ISSUER" | grep -qi "(STAGING)"; then
+  echo "📭 Detected staging certificate — will replace with production cert"
   NEEDS_NEW_CERT=true
+elif [[ "$IS_SELF_SIGNED" == "1" ]]; then
+  echo "📭 Self-signed cert found, will replace"
+  NEEDS_NEW_CERT=true
+else
+  echo "✅ Valid cert found — issuer: $ISSUER"
 fi
 
 if [[ "$NEEDS_NEW_CERT" == "true" ]]; then
-  if [[ -L "$LIVE_DIR" ]]; then
-    echo "🔗 Skipping deletion: cert dir is a symlink managed by certbot"
-  else
-    echo "🚮 Deleting unmanaged cert directory before requesting new cert"
-    rm -rf "$LIVE_DIR"
-  fi
-
+  echo "🚀 Requesting new certificate"
+  ACME_SERVER=""
   if [[ "${LETSENCRYPT_ENV_STAGING,,}" == "true" ]]; then
     ACME_SERVER="--server https://acme-staging-v02.api.letsencrypt.org/directory"
     echo "🧪 Using Let’s Encrypt STAGING environment"
   else
-    ACME_SERVER=""
     echo "✅ Using Let’s Encrypt PRODUCTION environment"
   fi
 
   retry docker run --rm \
-  -v "$CERTS_DIR":/var/www/certbot \
-  -v "$CERTS_DIR":/etc/letsencrypt \
-  certbot/certbot certonly \
-    --config-dir /etc/letsencrypt \
-    --work-dir /var/www/certbot \
-    --logs-dir /var/www/certbot \
-    --webroot -w /var/www/certbot \
-    --email "$SECRET_CERTBOT_EMAIL" \
-    -d "$SUBDOMAIN" \
-    --agree-tos --non-interactive \
-    $ACME_SERVER
+    -v "$CERTS_DIR":/var/www/certbot \
+    -v "$CERTS_DIR":/etc/letsencrypt \
+    certbot/certbot certonly \
+      --config-dir /etc/letsencrypt \
+      --work-dir /var/www/certbot \
+      --logs-dir /var/www/certbot \
+      --webroot -w /var/www/certbot \
+      --email "$SECRET_CERTBOT_EMAIL" \
+      -d "$SUBDOMAIN" \
+      --agree-tos --non-interactive \
+      $ACME_SERVER
 
-  echo "🔗 Updating current symlink to point to newly issued cert"
-  NEW_LIVE_DIR=$(find "$CERTS_DIR/live" -maxdepth 1 -type d -name "$SUBDOMAIN*" | sort | tail -n1)
-
-  if [[ -n "$NEW_LIVE_DIR" ]]; then
-    ln -sfn "$(realpath --relative-to="$CERTS_DIR" "$NEW_LIVE_DIR")" "$CURRENT_LINK"
-    echo "🔗 Updated current symlink to: $(readlink -f "$CURRENT_LINK")"
+  NEW_LIVE=$(find "$LIVE_BASE" -maxdepth 1 -type d -name "$SUBDOMAIN*" | sort | tail -n1)
+  if [[ -n "$NEW_LIVE" ]]; then
+    ln -sfn "$(realpath --relative-to="$CERTS_DIR" "$NEW_LIVE")" "$CURRENT_LINK"
+    echo "🔗 Updated symlink: $CURRENT_LINK → $(readlink -f "$CURRENT_LINK")"
+    echo "🔁 Reloading NGINX to apply new certificate"
+    docker-compose restart nginx
   else
-    echo "❌ Could not find new live cert dir after issuance"
+    echo "❌ No new live cert dir found after issuance"
     exit 1
   fi
-
-  echo "🔁 Reloading NGINX to apply new certificate"
-  docker-compose restart nginx
 
   # 🔗 Log current symlink used by NGINX
   if [[ -L "$CURRENT_LINK" ]]; then
@@ -382,31 +351,20 @@ if [[ "$NEEDS_NEW_CERT" == "true" ]]; then
     echo "⚠️  $CURRENT_LINK is not a symlink or is broken"
   fi
 
-  # 🧹 Cleanup: Warn about unreferenced numbered certificate directories
-  # This always logs warnings, but deletion is behind a feature flag.
-  echo "🔍 Scanning for unused numbered cert directories..."
+  echo "🧹 Scanning unused cert dirs..."
   shopt -s nullglob
-  for d in "$CERTS_DIR/live/${SUBDOMAIN}-"*; do
-    [[ -d "$d" ]] || continue
-    config_name="$(basename "$d")"
-    config_file="$CERTS_DIR/renewal/${config_name}.conf"
+  for d in "$LIVE_BASE/${SUBDOMAIN}-"*; do
+    config_file="$CERTS_DIR/renewal/$(basename "$d").conf"
     if [[ ! -f "$config_file" ]]; then
-      echo "⚠️ Found unused numbered cert dir: $d — not referenced by any renewal config"
-      if [[ "${CLEAN_UNUSED_CERTS:-false}" == "true" ]]; then
-        echo "🗑️  CLEAN_UNUSED_CERTS enabled — deleting: $d"
-        rm -rf "$d"
-      fi
+      echo "⚠️ Unreferenced dir: $d"
+      [[ "$CLEAN_UNUSED_CERTS" == "true" ]] && rm -rf "$d" && echo "🗑️ Deleted $d"
     fi
-    echo "🔗 Symlink status: $d -> $(readlink -f "$d" || echo '[not a symlink]')"
   done
   shopt -u nullglob
 fi
 
-# Diagnostic: list active renewal configs (optional)
-if [[ -d "$CERTS_DIR/renewal" ]]; then
-  echo "🧾 Renewal config files:"
-  ls -l "$CERTS_DIR/renewal"
-fi
+echo "🧾 Renewal configs:"
+ls -l "$CERTS_DIR/renewal" || echo "❌ None found"
 
 touch "$MARKER"
 
