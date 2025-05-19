@@ -306,9 +306,13 @@ if [[ -z "$ISSUER" ]]; then
 elif [[ "$IS_SELF_SIGNED" == "1" ]]; then
   echo "📭 Self-signed certificate detected — replacing with real certificate"
   NEEDS_NEW_CERT=true
-elif [[ "$LETSENCRYPT_ENV_STAGING" == "false" && "$ISSUER" =~ "\(STAGING\)" ]]; then
-  echo "📭 Detected staging cert but production is enabled — replacing with production cert"
-  NEEDS_NEW_CERT=true
+elif [[ "$LETSENCRYPT_ENV_STAGING" == "false" ]]; then
+  if echo "$ISSUER" | grep -q "(STAGING)"; then
+    echo "📭 Detected staging cert but production is enabled — replacing with production cert"
+    NEEDS_NEW_CERT=true
+  else
+    echo "✅ Production certificate is already in place — no action needed"
+  fi
 else
   echo "✅ Valid certificate present (issuer: $ISSUER) — no replacement needed"
 fi
@@ -325,6 +329,12 @@ else
     echo "✅ Using Let’s Encrypt PRODUCTION environment"
   fi
 
+  FORCE_RENEWAL=""
+  if [[ "$ISSUER" == *"(STAGING)"* || "$IS_SELF_SIGNED" == "1" ]]; then
+    echo "🔁 Forcing renewal to replace staging/self-signed cert with production"
+    FORCE_RENEWAL="--force-renewal"
+  fi
+
   retry docker run --rm \
     -v "$CERTS_DIR":/var/www/certbot \
     -v "$CERTS_DIR":/etc/letsencrypt \
@@ -336,7 +346,7 @@ else
       --email "$SECRET_CERTBOT_EMAIL" \
       -d "$SUBDOMAIN" \
       --agree-tos --non-interactive \
-      $ACME_SERVER
+      $ACME_SERVER $FORCE_RENEWAL
 
   NEW_LIVE=$(find "$LIVE_BASE" -maxdepth 1 -type d -name "$SUBDOMAIN*" | sort | tail -n1)
   if [[ -n "$NEW_LIVE" ]]; then
