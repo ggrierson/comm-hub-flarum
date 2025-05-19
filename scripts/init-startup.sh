@@ -67,6 +67,18 @@ set -euo pipefail
 
 echo "Running postboot bootstrap script"
 
+# Fetch and export GCE metadata vars
+echo "📦 Fetching metadata vars into env"
+for var in GIT_BRANCH SUBDOMAIN LETSENCRYPT_ENV_STAGING CLEAN_UNUSED_CERTS; do
+  value=$(curl -s -f -H "Metadata-Flavor: Google" \
+    "http://metadata.google.internal/computeMetadata/v1/instance/attributes/$var" || true)
+  export "$var"="$value"
+done
+echo "🔎 LETSENCRYPT_ENV_STAGING fetched as: '$LETSENCRYPT_ENV_STAGING'"
+
+# Optional: diagnostic
+env | grep -E 'GIT_BRANCH|SUBDOMAIN|LETSENCRYPT|CLEAN_UNUSED'
+
 # install minimal fetch tool
 if command -v curl &>/dev/null; then
   FETCH="curl -fsSL"

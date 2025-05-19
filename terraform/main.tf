@@ -47,6 +47,12 @@ resource "google_compute_instance" "flarum-vm" {
     startup-script   = file("../scripts/init-startup.sh")
     enable-osconfig  = "TRUE"
     postboot-script  = file("../scripts/postboot.sh")
+
+    # Injected environment variables
+    GIT_BRANCH               = var.git_branch
+    SUBDOMAIN                = var.domain
+    LETSENCRYPT_ENV_STAGING  = var.letsencrypt_env_staging
+    CLEAN_UNUSED_CERTS       = var.clean_unused_certs
   }
 
   boot_disk {
@@ -141,3 +147,22 @@ variable "enable_ops_agent" {
   type    = bool
   default = false
 }
+
+variable "git_branch" {
+  description = "Branch to check out in the VM"
+  type        = string
+  default     = "master"
+}
+
+variable "letsencrypt_env_staging" {
+  description = "Use Let's Encrypt staging environment"
+  type    = bool
+  default = false
+}
+
+variable "clean_unused_certs" {
+  description = "Clean up unused numbered cert directories"
+  type    = bool
+  default = false
+}
+
