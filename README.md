@@ -1,113 +1,233 @@
+# Flarum GCP Zero-Touch Deployment
 
+This project automates the deployment of a self-hosted [Flarum](https://flarum.org/) forum using Docker on Google Cloud Platform (GCP). It emphasizes security, idempotency, and zero-touch provisioning.
 
-# Flarum GCP Deployment (Automated)
+## Overview
 
-This project automates the deployment of a self-hosted [Flarum](https://flarum.org) forum using Google Cloud Platform with Docker Compose, Terraform, and Let's Encrypt TLS.
+* **Tech Stack**: Flarum (via [mondediefr/docker-flarum](https://github.com/mondediefr/docker-flarum)), MariaDB, NGINX, Certbot, Docker Compose, Terraform.
+* **Infrastructure**: GCP Compute Engine VM (Debian 12), persistent data disk, HTTPS via Let's Encrypt.
+* **Automation**: Provisioning and postboot logic fully automated via metadata scripts and secret injection.
+* **Security**: Passwords stored in Google Secret Manager, limited file permissions, hardened defaults.
 
----
+## Key Features
 
-## 🔧 What’s Included
+* **Zero-Touch Provisioning**: Entire setup runs without manual intervention after `terraform apply`.
+* **Idempotent Design**: Re-running provisioning scripts is safe and non-destructive.
+* **Persistent Data Volume**: Forum data is stored separately on a persistent disk that survives reboots and VM rebuilds.
+* **Secure Certificate Handling**:
 
-- Google Compute Engine VM
-- Separate persistent data disk (for safe redeploys)
-- Docker Compose setup with:
-  - Flarum
-  - MariaDB
-  - NGINX reverse proxy
-  - Certbot (auto-renew TLS)
-- DNS A record via Google Cloud DNS
-- Automated provisioning via startup script
+  * Certbot uses the webroot method.
+  * Automatic fallback to self-signed certificates for first boot.
+  * Renewals handled by a dedicated Docker container that triggers NGINX reloads.
+  * Certificate promotion logic switches to Let's Encrypt when available.
+  * Symlinked `/etc/letsencrypt/current` directory ensures stable paths for NGINX.
 
----
+## Project Structure and Boot Sequence
 
-## ⚠️ Security Notice
+This repository includes multiple directories and files organized as follows:
 
-**Warning:** This Dev Container binds your local `~/.config/gcloud`, `~/.docker`, `~/.gitconfig`, and `~/.ssh` directories. These mounts expose sensitive host credentials inside the container. Only use this setup on trusted, personal machines.
+```
+.
+├── .devcontainer/               # Devcontainer config (VSCode, Docker, Terraform preinstalled)
+├── nginx/                       # Custom NGINX configs and Certbot webroot
+├── scripts/                     # Startup and postboot automation scripts
+│   ├── init-startup.sh          # Injected via GCP metadata as `startup-script` (runs on VM boot)
+│   ├── postboot.sh              # Main provisioning logic: secrets, certs, Docker, services
+│   ├── logging.sh               # Shared logging functions, used by postboot.sh
+│   └── (bootstrap.sh)           # Created dynamically by `init-startup.sh` at runtime
+├── terraform/                   # Terraform configs: VM, DNS, disks, metadata
+│   ├── main.tf
+│   ├── outputs.tf
+│   ├── terraform.tfvars         # Per-deployment configuration (example below)
+│   └── variables.tf
+├── .flarum.env.template         # Template file used to generate .flarum.env
+├── docker-compose.yml           # Flarum, NGINX, MariaDB, Certbot containers
+├── README.md
+└── ...
+```
 
----
+### Boot Sequence
 
-## 🚀 Getting Started
+1. **Terraform Apply**: GCP VM and persistent disk are provisioned, metadata attributes injected (including startup-script).
+2. **`init-startup.sh` runs (via GCP metadata)**:
 
-### 🔁 Option 1: Use Terraform Locally or via Cloud Shell
+   * Minimal setup and logging.
+   * Writes and executes a temporary `bootstrap.sh` script.
+3. **`bootstrap.sh` (written to disk)**:
 
-We recommend using the Terraform CLI from your local machine **or** [Google Cloud Shell](https://cloud.google.com/shell). Cloud Shell provides a pre-authenticated environment with Terraform and gcloud pre-installed.
+   * Fetches postboot logic (`postboot.sh`) and metadata-injected config vars.
+4. **`postboot.sh`**:
 
-You can also launch Cloud Shell directly with the project preloaded:
+   * Waits for apt locks and systemd readiness.
+   * Installs dependencies and services.
+   * Templating of `.flarum.env` using Google Secret Manager.
+   * Sets permissions, configures TLS, and starts Docker Compose.
 
-[![Open in Cloud Shell](https://gstatic.com/cloudssh/images/open-btn.png)](https://ssh.cloud.google.com/cloudshell/editor?cloudshell_git_repo=https://github.com/ggrierson/comm-hub-flarum&cloudshell_working_dir=terraform)
+## Terraform Management
 
-To deploy using the CLI:
+The infrastructure is managed using Terraform. On initial deployment, a boot disk and persistent data disk are created. The VM is rebuilt by tainting the compute instance (leaving the data disk untouched):
 
-1. **Configure your domain** in Google Cloud DNS.
-2. **Create `terraform.tfvars`** with your values.
-3. **Provision infrastructure**:
-   ```bash
-   terraform init
-   terraform apply -var-file=terraform.tfvars
-   ```
-
-4. Visit your forum: `https://yourdomain.com`
-
-### 🧱 Option 2: Use Google Infrastructure Manager (GIM)
-
-GIM is a fully managed service that can apply and manage Terraform configs from the GCP Console. Ideal for production workflows, team collaboration, or auditability.
-
-Read more: [Infrastructure Manager](https://cloud.google.com/infrastructure-manager/docs/overview)
-
-### 🐳 Option 3: Use a Dev Container (VS Code Remote)
-
-This repo includes a `.devcontainer.json` configuration to launch a dedicated VS Code Dev Container with:
-
-- Docker-in-Docker
-- Terraform
-- Google Cloud CLI
-- VS Code extensions for Terraform, Docker, and Cloud Code
-
-Inside the Dev Container, you can run:
 ```bash
-gcloud auth login
-terraform plan
+terraform taint google_compute_instance.flarum_vm
 terraform apply -var-file=terraform.tfvars
 ```
 
----
+DNS records are managed via Google Cloud DNS and are updated based on the `SUBDOMAIN` variable. VM metadata injection is used to supply configuration, scripts, and secrets.
 
-## ⚠️ Terraform Management Tips
+## Example `terraform.tfvars`
 
-### ❌ To Safely Reset the VM Without Destroying Data or DNS
-```bash
-terraform destroy \
-  -target=google_compute_instance.flarum_vm \
-  -auto-approve && \
-terraform apply -auto-approve
+```hcl
+project_id              = "example-project-id"
+region                  = "asia-southeast1"
+zone                    = "asia-southeast1-b"
+domain                  = "forum.example.com"
+git_branch              = "main"
+loglevel                = "info"
+letsencrypt_env_staging = false
+clean_unused_certs      = true
 ```
-- Keeps your **data disk** and **static IP/DNS record** intact
-- Good for iterative testing of provisioning scripts or instance config
 
-### ⚠️ To Wipe Everything (Use With Caution)
-```bash
-terraform destroy -auto-approve
+## Devcontainer Usage
+
+This project is optimized for use with [Dev Containers](https://containers.dev/). The `.devcontainer` folder provides a reproducible environment for editing, testing, and deploying:
+
+* Pre-configured with Docker, Terraform, and Google SDK tools.
+* Enables GitHub Codespaces or local VS Code development.
+* Mounts credentials and SSH keys via secrets for seamless deployment.
+
+To use:
+
+1. Open the project in VS Code.
+2. Reopen in container when prompted.
+3. Authenticate via `gcloud auth login`.
+4. Use Terraform and Docker commands as needed.
+
+## Deployment Variables
+
+Injected as metadata attributes in Terraform:
+
+```hcl
+metadata = {
+  startup-script          = file("../scripts/init-startup.sh")
+  postboot-script         = file("../scripts/postboot.sh")
+  logging-lib             = file("../scripts/logging.sh")
+  enable-osconfig         = "TRUE"
+
+  # Configuration flags
+  GIT_BRANCH              = var.git_branch
+  SUBDOMAIN               = var.domain
+  LETSENCRYPT_ENV_STAGING = var.letsencrypt_env_staging
+  CLEAN_UNUSED_CERTS      = var.clean_unused_certs
+  LOGLEVEL                = var.loglevel
+}
 ```
-- Destroys all resources, including data disk and static IP
-- Only use if you're starting completely fresh
 
-### ✅ Safety Features Enabled
-- `prevent_destroy = true` on your data disk to avoid accidental loss
-- Static IP is defined and optionally preserved across redeployments
+## Logging
 
-### 🔍 Tip
-Use `terraform plan` before `apply` to preview changes, especially when dealing with IPs and disks
+All scripts support log-level-based output, controlled by the `LOGLEVEL` variable (`debug`, `info`, etc). The `logging.sh` script maps log level strings to severity and conditionally enables `set -x` for shell tracing in debug mode.
+
+In `postboot.sh`, the log level is sourced and respected for all subsequent output:
+
+```bash
+# Example usage:
+log_info "Starting deployment"
+log_debug "Certificate symlink resolved"
+```
+
+## Environment Templating
+
+`.flarum.env.template` is used to generate `.flarum.env` dynamically using secrets from Google Secret Manager. Secrets are fetched securely and inserted using `sed` after proper escaping.
+
+All secrets such as database passwords, admin credentials, and Certbot email are handled this way. The resulting `.flarum.env` is never committed to git.
+
+## File Permissions and Security
+
+* `.flarum.env` is locked down post-templating:
+
+  ```bash
+  chmod 640 .flarum.env
+  chown root:$(logname) .flarum.env
+  ```
+
+  This allows `docker-compose` to function without exposing secrets to other users.
+
+* `/opt/flarum-data` (mounted persistent disk) is tightened:
+
+  ```bash
+  chmod 700 /opt/flarum-data
+  chown root:root /opt/flarum-data
+  ```
+
+## Password Rotation
+
+Passwords are injected from Google Secret Manager and used during provisioning:
+
+* `flarum-db-password`: for Flarum's DB user.
+* `flarum-maria-root-password`: for MariaDB `root@localhost`.
+
+**To rotate passwords:**
+
+1. Update the secrets in Google Secret Manager.
+2. SSH into the VM and run:
+
+   ```bash
+   docker exec -it flarum_db mysql -uroot -p
+   ```
+
+   Then in the MariaDB shell:
+
+   ```sql
+   ALTER USER 'flarum'@'%' IDENTIFIED BY 'new_password';
+   ALTER USER 'root'@'localhost' IDENTIFIED BY 'new_password';
+   FLUSH PRIVILEGES;
+   DROP USER 'root'@'%';
+   ```
+3. Update the secrets in Secret Manager and re-run `postboot.sh` (or rebuild the VM).
+
+## Multi-Module Architecture
+
+This deployment isolates Flarum as a module and can be extended into a broader application ecosystem. Separation is achieved via subdomain routing, container separation, and isolated config files. Each module can be independently developed and versioned.
+
+## Troubleshooting
+
+* **Login issues with MySQL**:
+
+  * Use `MYSQL_PWD='...' mysql -uroot` or pass the password inline (no space):
+
+    ```bash
+    mysql -uroot -pYourPasswordHere
+    ```
+  * Interactive prompt paste may silently fail depending on terminal.
+
+* **Access denied (password issue)**:
+
+  * Check `.flarum.env` for pollution. Ensure values do not include `[INFO]` prefixes (from logging).
+
+* **Resetting the VM**:
+
+  * Use `terraform taint google_compute_instance.flarum_vm && terraform apply -var-file=terraform.tfvars` to recreate the boot disk without affecting the data volume.
+
+## .gitignore
+
+Sensitive files are excluded:
+
+```gitignore
+.terraform/
+*.tfstate*
+terraform.tfvars
+certs/
+.env
+*.log
+.flarum.env
+```
+
+## Security Considerations
+
+* **Never store secrets in source control** — all secrets must be handled via Google Secret Manager.
+* **Avoid logging secrets** — log only minimal info during `init-startup.sh` and `bootstrap.sh`.
+* **Lock down files** — `.flarum.env` and mounted volumes are permission-restricted.
+* **Drop remote root user** — `DROP USER 'root'@'%'` is strongly recommended.
 
 ---
 
-## 🛡️ Security
-
-Secrets are pulled via Google Secret Manager during startup and never stored in source control.
-
----
-
-## 📦 Notes
-
-- All persistent data is stored on a non-boot disk.
-- Redeploying the VM does **not** destroy your forum data.
-- TLS renews automatically every 12h via cron loop in the `certbot` container.
+For more information, see the original Docker image [here](https://github.com/mondediefr/docker-flarum) or [Flarum Docs](https://docs.flarum.org/).
