@@ -1,5 +1,8 @@
 #!/bin/bash
 # === LOGGING LIBRARY ===
+# Use the injected LOGLEVEL if available, fallback only if unset
+LOGLEVEL="${LOGLEVEL:-info}"
+echo "LOGLEVEL=$LOGLEVEL"
 
 # Map log level to numeric severity
 case "$LOGLEVEL" in

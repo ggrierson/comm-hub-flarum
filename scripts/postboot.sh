@@ -13,12 +13,9 @@ else
   FETCH="curl -fsSL"
 fi
 
-# Fetch loglevel before sourcing logging functions
-LOGLEVEL="$($FETCH -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/attributes/loglevel 2>/dev/null || echo "info")"
-export LOGLEVEL
-
 # Load logging functions from metadata
 eval "$($FETCH -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/attributes/logging-lib)"
+log_debug "✅ Logging functions loaded successfully"
 
 ## MARK: TERRAFORM ENV
 # Safe initialization of Terraform-injected vars
@@ -26,7 +23,6 @@ GIT_BRANCH="${GIT_BRANCH:-}"
 SUBDOMAIN="${SUBDOMAIN:-forum-hub.team-apps.net}"
 LETSENCRYPT_ENV_STAGING="${LETSENCRYPT_ENV_STAGING:-false}"
 CLEAN_UNUSED_CERTS="${CLEAN_UNUSED_CERTS:-false}"
-LOGLEVEL="${LOGLEVEL:-"info"}"
 
 # ✅ Diagnostic: Show active configuration
 log_info "🌿 Terraform-injected config vars:"
@@ -34,7 +30,6 @@ log_info "  - GIT_BRANCH=$GIT_BRANCH"
 log_info "  - SUBDOMAIN=$SUBDOMAIN"
 log_info "  - LETSENCRYPT_ENV_STAGING=$LETSENCRYPT_ENV_STAGING"
 log_info "  - CLEAN_UNUSED_CERTS=$CLEAN_UNUSED_CERTS"
-log_info "  - LOGLEVEL=$LOGLEVEL"
 
 # MARK: INITIAL BOOT LOGIC
 # Optional marker logic: only skip heavy bootstrap tasks
@@ -204,7 +199,7 @@ cp .flarum.env.template .flarum.env
 
 #Helper function - escape &, /, \ in the value before sed
 escape_sed() {
-  log_info "$1" | sed -e 's/[&/\]/\\&/g'
+  echo "$1" | sed -e 's/[&/\]/\\&/g'
 }
 
 # Escape all values for sed safety
@@ -236,8 +231,8 @@ if id "$DEPLOY_USER" &>/dev/null; then
   chown root:"$DEPLOY_USER" .flarum.env
 else
   log_warn "⚠ Could not determine deploy user, defaulting to root:root"
-chmod 640 .flarum.env
-chown root:root .flarum.env
+  chmod 640 .flarum.env
+  chown root:root .flarum.env
 fi
 log_info "✅ Permissions set to 640 (readable by root and group)"
 
