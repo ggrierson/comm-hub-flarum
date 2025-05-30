@@ -228,9 +228,17 @@ retry sed -i "s|{{SMTP_PASS}}|$SMTP_PASS_ESCAPED|g" .flarum.env
 retry sed -i "s|{{SMTP_MAIL_FROM}}|$SMTP_MAIL_FROM_ESCAPED|g" .flarum.env
 log_info ".flarum.env file templated"
 
+DEPLOY_USER="$(logname 2>/dev/null || who | awk '{print $1}' | head -n1)"
 log_info "🔐 Securing .flarum.env permissions"
+if id "$DEPLOY_USER" &>/dev/null; then
+  log_info "🔐 Making .flarum.env readable by group: $DEPLOY_USER"
+  chmod 640 .flarum.env
+  chown root:"$DEPLOY_USER" .flarum.env
+else
+  log_warn "⚠ Could not determine deploy user, defaulting to root:root"
 chmod 640 .flarum.env
 chown root:root .flarum.env
+fi
 log_info "✅ Permissions set to 640 (readable by root and group)"
 
 ## MARK: INITIAL CERTS
