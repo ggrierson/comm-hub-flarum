@@ -10,7 +10,13 @@ crash.log
 certs/
 .env
 .env.*.local
+# ↓	explicitly ignore generated .env files at root
+/*.env
 docker-compose.override.yml
+
+# Boot script artifacts
+# ↓	temporary GitHub token file (deleted by postboot.sh)
+/root/.netrc
 
 # Logs
 *.log

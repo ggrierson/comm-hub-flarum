@@ -47,12 +47,15 @@ resource "google_compute_instance" "flarum-vm" {
     startup-script   = file("../scripts/init-startup.sh")
     enable-osconfig  = "TRUE"
     postboot-script  = file("../scripts/postboot.sh")
+    logging-lib      = file("../scripts/logging.sh")
+
 
     # Injected environment variables
     GIT_BRANCH               = var.git_branch
     SUBDOMAIN                = var.domain
     LETSENCRYPT_ENV_STAGING  = var.letsencrypt_env_staging
     CLEAN_UNUSED_CERTS       = var.clean_unused_certs
+    LOGLEVEL                 = var.loglevel
   }
 
   boot_disk {
@@ -164,5 +167,11 @@ variable "clean_unused_certs" {
   description = "Clean up unused numbered cert directories"
   type    = bool
   default = false
+}
+
+variable "loglevel" {
+  description = "Standard log levels (debug, info, warn, error)"
+  type        = string
+  default     = "info"
 }
 
