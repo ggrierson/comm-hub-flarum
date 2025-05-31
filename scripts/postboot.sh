@@ -14,7 +14,11 @@ else
 fi
 
 # Load logging functions from metadata
-eval "$($FETCH -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/attributes/logging-lib)"
+eval "$(
+  $FETCH -H "Metadata-Flavor: Google" \
+    http://metadata.google.internal/computeMetadata/v1/instance/attributes/logging-lib \
+    || echo 'echo "[ERROR] Failed to fetch logging-lib"; exit 1'
+)"
 log_debug "✅ Logging functions loaded successfully"
 
 ## MARK: TERRAFORM ENV

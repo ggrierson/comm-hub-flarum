@@ -14,10 +14,12 @@ case "$LOGLEVEL" in
 esac
 
 # Logging functions
-log_debug() { [ "$LEVEL_NUM" -ge 3 ] && echo "[DEBUG] $1"; }
-log_info()  { [ "$LEVEL_NUM" -ge 2 ] && echo "[INFO]  $1"; }
-log_warn()  { [ "$LEVEL_NUM" -ge 1 ] && echo "[WARN]  $1" >&2; }
-log_error() { echo "[ERROR] $1" >&2; }
+log_debug() { [ "$LEVEL_NUM" -ge 3 ] && echo "[DEBUG] $1" || true; }
+log_info()  { [ "$LEVEL_NUM" -ge 2 ] && echo "[INFO] $1"  || true; }
+log_warn()  { [ "$LEVEL_NUM" -ge 1 ] && echo "[WARN] $1" >&2 || true; }
+log_error() { echo "[ERROR] $1" >&2; }  # Always prints, so no need for || true
 
 # Enable shell tracing in debug mode
 [ "$LEVEL_NUM" -ge 3 ] && set -x
+
+true  # prevents eval from exiting on last line
