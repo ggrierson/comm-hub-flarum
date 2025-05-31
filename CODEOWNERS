@@ -1,0 +1,9 @@
+# This file designates responsibility for different parts of the repo
+
+## Global owner (everything by default)
+* @ggrierson
+
+## Ownership of specific directories or files
+* /scripts/       @ggrierson
+* /terraform/     @ggrierson
+* /docker-compose.yml  @ggrierson
