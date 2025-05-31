@@ -1,0 +1,19 @@
+Flarum GCP Zero-Touch Deployment
+Copyright 2025 G. Grierson (https://github.com/ggrierson)
+
+This product includes software and configuration code licensed under the Apache License, Version 2.0.
+
+Included components:
+
+- Flarum (https://flarum.org/) – MIT License
+- mondediefr/docker-flarum (https://github.com/mondediefr/docker-flarum) – MIT License
+- NGINX (https://nginx.org/) – BSD-like License
+- Certbot (https://certbot.eff.org/) – Apache 2.0 License
+- MariaDB (https://mariadb.org/) – GPLv2 License
+- Google Cloud SDK and metadata services – Subject to Google’s Terms of Service
+
+This deployment integrates and orchestrates the above technologies via shell scripts and Terraform.
+
+Modifications, automation logic, and deployment framework are authored by djmagnetix and contributors.
+
+No warranty is expressed or implied. See LICENSE file for full terms.
